@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import { CheckCircle, XCircle, Loader2, Mail, ArrowRight } from "lucide-react";
@@ -9,7 +9,27 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/use-auth";
 
-export default function VerifyEmailPage() {
+// Loading component for Suspense fallback
+function VerifyEmailLoading() {
+  return (
+    <div className="min-h-screen bg-gradient-dark flex items-center justify-center p-4">
+      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6 }} className="w-full max-w-md">
+        <Card className="glass-card border-white/20 shadow-2xl">
+          <CardHeader className="text-center pb-6">
+            <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ delay: 0.2, type: "spring", stiffness: 200 }} className="flex justify-center mb-4">
+              <Loader2 className="h-16 w-16 text-purple-400 animate-spin" />
+            </motion.div>
+            <CardTitle className="text-2xl font-bold text-white">Loading...</CardTitle>
+            <CardDescription className="text-gray-300">Preparing email verification...</CardDescription>
+          </CardHeader>
+        </Card>
+      </motion.div>
+    </div>
+  );
+}
+
+// Component that uses useSearchParams
+function VerifyEmailContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const token = searchParams.get("token");
@@ -156,7 +176,7 @@ export default function VerifyEmailPage() {
             {getStatus() === "success" && (
               <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.4 }} className="text-center space-y-4">
                 <div className="bg-green-500/10 border border-green-500/20 rounded-lg p-4">
-                  <p className="text-green-400 text-sm">Welcome to EchoMind! You&apos;ll be redirected to your dashboard shortly.</p>
+                  <p className="text-green-400 text-sm">Welcome to Sociallim! You&apos;ll be redirected to your dashboard shortly.</p>
                 </div>
 
                 <Button onClick={() => router.push("/dashboard")} className="w-full btn-gradient-primary">
@@ -196,5 +216,14 @@ export default function VerifyEmailPage() {
         </Card>
       </motion.div>
     </div>
+  );
+}
+
+// Main page component with Suspense boundary
+export default function VerifyEmailPage() {
+  return (
+    <Suspense fallback={<VerifyEmailLoading />}>
+      <VerifyEmailContent />
+    </Suspense>
   );
 }
