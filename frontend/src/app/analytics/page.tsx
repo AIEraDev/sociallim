@@ -46,7 +46,7 @@ const analyticsStats = [
 export default function AnalyticsPage() {
   return (
     <div className="min-h-screen bg-gradient-dark">
-      <LeftNav />
+      <Sidebar />
       <div className="transition-all duration-300">
         <Topbar />
         <main className="w-full lg:max-w-[calc(100vw-240px)] mx-auto px-4 sm:px-6 py-6 sm:py-8">

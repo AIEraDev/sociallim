@@ -1,12 +1,9 @@
 "use client";
 
-import { useState } from "react";
-import { motion } from "framer-motion";
 import { Search, Filter, Download, RefreshCw, Plus, Calendar } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Sidebar } from "@/components/dashboard/Sidebar";
 import { Topbar } from "@/components/dashboard/topbar";
 import { PostCard } from "@/components/dashboard/post-card";
@@ -60,22 +57,18 @@ const mockAnalyses = [
 ];
 
 export default function AnalysesPage() {
-  const [selectedAnalysis, setSelectedAnalysis] = useState<number | null>(null);
-
-  const handleViewDetails = (id: number) => {
-    setSelectedAnalysis(id);
-  };
+  const handleViewDetails = (id: number) => {};
 
   return (
     <div className="min-h-screen bg-gradient-dark">
-      <LeftNav />
+      <Sidebar />
       <div className="transition-all duration-300">
         <Topbar />
         <main className="w-full lg:max-w-[calc(100vw-240px)] mx-auto px-4 sm:px-6 py-6 sm:py-8">
           {/* Header */}
           <div className="mb-8">
             <h1 className="text-3xl font-bold text-foreground mb-2">Analyses</h1>
-            <p className="text-[var(--vr-muted)]">View and manage all your sentiment analyses</p>
+            <p className="text-(--vr-muted)">View and manage all your sentiment analyses</p>
           </div>
 
           {/* Filters and Actions */}
