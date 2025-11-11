@@ -1,0 +1,79 @@
+# Grafana Datasource Provisioning Configuration
+# Automatically configures data sources for Comment Sentiment Analyzer monitoring
+
+apiVersion: 1
+
+datasources:
+  # Prometheus - Primary metrics datasource
+  - name: Prometheus
+    type: prometheus
+    access: proxy
+    url: http://prometheus:9090
+    isDefault: true
+    editable: true
+    jsonData:
+      timeInterval: "15s"
+      queryTimeout: "60s"
+      httpMethod: "POST"
+      manageAlerts: true
+      prometheusType: "Prometheus"
+      prometheusVersion: "2.40.0"
+      cacheLevel: "High"
+      incrementalQuerying: true
+      incrementalQueryOverlapWindow: "10m"
+    secureJsonData: {}
+
+  # PostgreSQL - Database metrics and logs
+  - name: PostgreSQL
+    type: postgres
+    access: proxy
+    url: db:5432
+    database: ${POSTGRES_DB:-comment_analyzer}
+    user: ${POSTGRES_USER:-analyzer}
+    secureJsonData:
+      password: ${POSTGRES_PASSWORD:-secure_password}
+    jsonData:
+      sslmode: "disable"
+      maxOpenConns: 10
+      maxIdleConns: 2
+      connMaxLifetime: 14400
+      postgresVersion: 1500
+      timescaledb: false
+
+  # Loki - Log aggregation (if enabled)
+  - name: Loki
+    type: loki
+    access: proxy
+    url: http://loki:3100
+    editable: true
+    jsonData:
+      maxLines: 1000
+      derivedFields:
+        - datasourceUid: "prometheus"
+          matcherRegex: "correlation_id=(\\w+)"
+          name: "Correlation ID"
+          url: "/explore?orgId=1&left=%5B%22now-1h%22,%22now%22,%22Prometheus%22,%7B%22expr%22:%22%7Bcorrelation_id%3D%5C%22$${__value.raw}%5C%22%7D%22%7D%5D"
+
+  # Jaeger - Distributed tracing (if enabled)
+  - name: Jaeger
+    type: jaeger
+    access: proxy
+    url: http://jaeger:16686
+    editable: true
+    jsonData:
+      tracesToLogs:
+        datasourceUid: "loki"
+        tags: ["correlation_id", "trace_id"]
+        mappedTags: [{ "key": "service.name", "value": "service" }]
+        mapTagNamesEnabled: true
+        spanStartTimeShift: "-1h"
+        spanEndTimeShift: "1h"
+        filterByTraceID: true
+        filterBySpanID: false
+
+  # TestData - For dashboard development
+  - name: TestData
+    type: testdata
+    access: proxy
+    editable: true
+    jsonData: {}

@@ -1,0 +1,1740 @@
+openapi: 3.0.3
+info:
+  title: Comment Sentiment Analyzer API
+  description: |
+    The Comment Sentiment Analyzer API provides comprehensive sentiment analysis for social media comments across multiple platforms. 
+    This RESTful API enables content creators to connect their social media accounts, analyze comment sentiment, and gain actionable insights about their audience engagement.
+
+    ## Features
+    - Multi-platform social media integration (YouTube, Instagram, Twitter/X, TikTok)
+    - AI-powered sentiment analysis with emotion detection
+    - Theme clustering and keyword extraction
+    - Real-time analysis progress tracking
+    - Comprehensive export capabilities
+    - Analysis comparison and trending
+
+    ## Authentication
+    The API uses JWT (JSON Web Token) based authentication. Include the token in the Authorization header:
+    ```
+    Authorization: Bearer <your_jwt_token>
+    ```
+
+    ## Rate Limiting
+    API requests are rate limited to ensure fair usage:
+    - Authentication: 100 requests/hour
+    - Platform Operations: 50 requests/hour  
+    - Analysis Operations: 100 requests/hour
+    - Export Operations: 20 requests/hour
+
+  version: 1.0.0
+  contact:
+    name: Comment Sentiment Analyzer Support
+    email: support@comment-analyzer.com
+    url: https://docs.comment-analyzer.com
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+
+servers:
+  - url: https://api.comment-analyzer.com/v1
+    description: Production server
+  - url: https://staging-api.comment-analyzer.com/v1
+    description: Staging server
+  - url: http://localhost:3000/v1
+    description: Development server
+
+paths:
+  # Authentication Endpoints
+  /auth/register:
+    post:
+      tags:
+        - Authentication
+      summary: Register a new user account
+      description: |
+        Creates a new user account with email and password. Returns user data and JWT token for immediate authentication.
+        Password must meet security requirements (8+ characters, uppercase, lowercase, number, special character).
+      operationId: registerUser
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RegisterRequest"
+            examples:
+              basic_registration:
+                summary: Basic user registration
+                value:
+                  email: "user@example.com"
+                  password: "SecurePass123!"
+                  firstName: "John"
+                  lastName: "Doe"
+      responses:
+        "201":
+          description: User registered successfully
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/ApiResponse"
+                  - type: object
+                    properties:
+                      data:
+                        $ref: "#/components/schemas/AuthResponse"
+              examples:
+                success:
+                  summary: Successful registration
+                  value:
+                    success: true
+                    data:
+                      user:
+                        id: "user_123"
+                        email: "user@example.com"
+                        firstName: "John"
+                        lastName: "Doe"
+                        createdAt: "2024-01-15T10:30:00Z"
+                        emailVerified: false
+                      token: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+                      expiresAt: "2024-01-22T10:30:00Z"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "409":
+          $ref: "#/components/responses/ConflictError"
+        "429":
+          $ref: "#/components/responses/RateLimitError"
+
+  /auth/login:
+    post:
+      tags:
+        - Authentication
+      summary: Authenticate user login
+      description: |
+        Validates user credentials and returns JWT token for API access. 
+        Updates user's last login timestamp and creates cached session.
+      operationId: loginUser
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoginRequest"
+            examples:
+              user_login:
+                summary: User login
+                value:
+                  email: "user@example.com"
+                  password: "SecurePass123!"
+      responses:
+        "200":
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/ApiResponse"
+                  - type: object
+                    properties:
+                      data:
+                        $ref: "#/components/schemas/AuthResponse"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/AuthenticationError"
+        "429":
+          $ref: "#/components/responses/RateLimitError"
+
+  /auth/profile:
+    get:
+      tags:
+        - Authentication
+      summary: Get current user profile
+      description: Returns the authenticated user's profile information
+      operationId: getUserProfile
+      security:
+        - BearerAuth: []
+      responses:
+        "200":
+          description: User profile retrieved successfully
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/ApiResponse"
+                  - type: object
+                    properties:
+                      data:
+                        $ref: "#/components/schemas/User"
+        "401":
+          $ref: "#/components/responses/AuthenticationError"
+
+    put:
+      tags:
+        - Authentication
+      summary: Update user profile
+      description: Updates the authenticated user's profile information
+      operationId: updateUserProfile
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateProfileRequest"
+      responses:
+        "200":
+          description: Profile updated successfully
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/ApiResponse"
+                  - type: object
+                    properties:
+                      data:
+                        $ref: "#/components/schemas/User"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/AuthenticationError"
+
+  # Platform Connection Endpoints
+  /platforms:
+    get:
+      tags:
+        - Platforms
+      summary: Get connected social media platforms
+      description: Returns all connected social media platforms for the authenticated user
+      operationId: getConnectedPlatforms
+      security:
+        - BearerAuth: []
+      responses:
+        "200":
+          description: Connected platforms retrieved successfully
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/ApiResponse"
+                  - type: object
+                    properties:
+                      data:
+                        $ref: "#/components/schemas/PlatformConnectionSummary"
+        "401":
+          $ref: "#/components/responses/AuthenticationError"
+
+  /platforms/connect/{platform}:
+    get:
+      tags:
+        - Platforms
+      summary: Initiate OAuth connection for platform
+      description: |
+        Initiates OAuth flow for connecting a social media platform. 
+        Returns authorization URL to redirect user to platform's OAuth consent screen.
+      operationId: connectPlatform
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: platform
+          in: path
+          required: true
+          description: Social media platform to connect
+          schema:
+            $ref: "#/components/schemas/Platform"
+          example: youtube
+      responses:
+        "200":
+          description: OAuth URL generated successfully
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/ApiResponse"
+                  - type: object
+                    properties:
+                      data:
+                        $ref: "#/components/schemas/OAuthInitiationResponse"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/AuthenticationError"
+
+  /platforms/disconnect/{platform}:
+    delete:
+      tags:
+        - Platforms
+      summary: Disconnect social media platform
+      description: Removes the connection to a social media platform and revokes stored tokens
+      operationId: disconnectPlatform
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: platform
+          in: path
+          required: true
+          description: Social media platform to disconnect
+          schema:
+            $ref: "#/components/schemas/Platform"
+      responses:
+        "204":
+          description: Platform disconnected successfully
+        "401":
+          $ref: "#/components/responses/AuthenticationError"
+        "404":
+          $ref: "#/components/responses/NotFoundError"
+
+  # Posts Endpoints
+  /platforms/posts:
+    get:
+      tags:
+        - Posts
+      summary: Fetch user posts from connected platforms
+      description: |
+        Retrieves posts from connected social media platforms with filtering and pagination support.
+        Posts are fetched from platform APIs and cached for performance.
+      operationId: getUserPosts
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: platform
+          in: query
+          description: Filter by specific platform
+          schema:
+            $ref: "#/components/schemas/Platform"
+        - name: limit
+          in: query
+          description: Number of posts to return
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+        - name: page
+          in: query
+          description: Page number for pagination
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - name: dateFrom
+          in: query
+          description: Start date filter (ISO 8601)
+          schema:
+            type: string
+            format: date-time
+        - name: dateTo
+          in: query
+          description: End date filter (ISO 8601)
+          schema:
+            type: string
+            format: date-time
+        - name: search
+          in: query
+          description: Search query for post titles
+          schema:
+            type: string
+            maxLength: 100
+      responses:
+        "200":
+          description: Posts retrieved successfully
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/ApiResponse"
+                  - type: object
+                    properties:
+                      data:
+                        $ref: "#/components/schemas/PaginatedPostResponse"
+        "401":
+          $ref: "#/components/responses/AuthenticationError"
+        "429":
+          $ref: "#/components/responses/RateLimitError"
+
+  /posts/{postId}:
+    get:
+      tags:
+        - Posts
+      summary: Get specific post details
+      description: Returns detailed information about a specific post including metadata and engagement metrics
+      operationId: getPost
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: postId
+          in: path
+          required: true
+          description: Unique post identifier
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Post retrieved successfully
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/ApiResponse"
+                  - type: object
+                    properties:
+                      data:
+                        $ref: "#/components/schemas/PostResponse"
+        "401":
+          $ref: "#/components/responses/AuthenticationError"
+        "404":
+          $ref: "#/components/responses/NotFoundError"
+
+  # Analysis Endpoints
+  /analysis/start:
+    post:
+      tags:
+        - Analysis
+      summary: Start sentiment analysis for a post
+      description: |
+        Initiates sentiment analysis for a specific post's comments. 
+        Creates a background job and returns job ID for progress tracking.
+        Analysis includes sentiment classification, emotion detection, theme extraction, and summary generation.
+      operationId: startAnalysis
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/StartAnalysisRequest"
+            examples:
+              basic_analysis:
+                summary: Basic analysis request
+                value:
+                  postId: "post_123"
+              advanced_analysis:
+                summary: Analysis with custom options
+                value:
+                  postId: "post_123"
+                  options:
+                    includeSpamDetection: true
+                    includeToxicityFilter: true
+                    maxComments: 1000
+                    sentimentModel: "enhanced"
+      responses:
+        "201":
+          description: Analysis started successfully
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/ApiResponse"
+                  - type: object
+                    properties:
+                      data:
+                        $ref: "#/components/schemas/AnalysisJobResponse"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/AuthenticationError"
+        "429":
+          $ref: "#/components/responses/RateLimitError"
+
+  /analysis/{jobId}/status:
+    get:
+      tags:
+        - Analysis
+      summary: Get analysis job status and progress
+      description: |
+        Returns current status and progress of an analysis job.
+        Use this endpoint to poll for job completion. Job statuses include:
+        pending, processing, completed, failed, cancelled.
+      operationId: getAnalysisStatus
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: jobId
+          in: path
+          required: true
+          description: Analysis job identifier
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Job status retrieved successfully
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/ApiResponse"
+                  - type: object
+                    properties:
+                      data:
+                        $ref: "#/components/schemas/AnalysisJobResponse"
+        "401":
+          $ref: "#/components/responses/AuthenticationError"
+        "404":
+          $ref: "#/components/responses/NotFoundError"
+
+  /analysis/{analysisId}/results:
+    get:
+      tags:
+        - Analysis
+      summary: Get complete analysis results
+      description: |
+        Returns comprehensive analysis results including sentiment breakdown,
+        emotions, themes, keywords, and AI-generated summary.
+      operationId: getAnalysisResults
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: analysisId
+          in: path
+          required: true
+          description: Analysis result identifier
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Analysis results retrieved successfully
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/ApiResponse"
+                  - type: object
+                    properties:
+                      data:
+                        $ref: "#/components/schemas/AnalysisResultResponse"
+        "401":
+          $ref: "#/components/responses/AuthenticationError"
+        "404":
+          $ref: "#/components/responses/NotFoundError"
+
+  /analysis/history:
+    get:
+      tags:
+        - Analysis
+      summary: Get user's analysis history
+      description: Returns paginated list of user's past analysis results with summary information
+      operationId: getAnalysisHistory
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: limit
+          in: query
+          description: Number of results to return
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+        - name: page
+          in: query
+          description: Page number for pagination
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - name: platform
+          in: query
+          description: Filter by platform
+          schema:
+            $ref: "#/components/schemas/Platform"
+        - name: dateFrom
+          in: query
+          description: Start date filter
+          schema:
+            type: string
+            format: date-time
+        - name: dateTo
+          in: query
+          description: End date filter
+          schema:
+            type: string
+            format: date-time
+      responses:
+        "200":
+          description: Analysis history retrieved successfully
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/ApiResponse"
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          items:
+                            type: array
+                            items:
+                              $ref: "#/components/schemas/AnalysisResultResponse"
+                          pagination:
+                            $ref: "#/components/schemas/PaginationMeta"
+        "401":
+          $ref: "#/components/responses/AuthenticationError"
+
+  # Export Endpoints
+  /analysis/{analysisId}/export:
+    post:
+      tags:
+        - Export
+      summary: Export analysis results
+      description: |
+        Generates downloadable export of analysis results in various formats.
+        Supports PDF reports, CSV data, JSON format, and image exports.
+        Download URLs expire after 24 hours.
+      operationId: exportAnalysis
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: analysisId
+          in: path
+          required: true
+          description: Analysis result identifier
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ExportAnalysisRequest"
+            examples:
+              pdf_export:
+                summary: PDF report export
+                value:
+                  format: "pdf"
+                  options:
+                    includeCharts: true
+                    includeDetails: true
+                    branding:
+                      companyName: "My Brand"
+              csv_export:
+                summary: CSV data export
+                value:
+                  format: "csv"
+                  options:
+                    includeRawData: true
+      responses:
+        "201":
+          description: Export created successfully
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/ApiResponse"
+                  - type: object
+                    properties:
+                      data:
+                        $ref: "#/components/schemas/ExportResponse"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/AuthenticationError"
+        "404":
+          $ref: "#/components/responses/NotFoundError"
+
+  # Comparison Endpoints
+  /analysis/compare:
+    post:
+      tags:
+        - Analysis
+      summary: Compare multiple analysis results
+      description: |
+        Compares sentiment analysis results across multiple posts to identify trends,
+        patterns, and performance differences. Generates comparative insights and recommendations.
+      operationId: compareAnalyses
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CompareAnalysesRequest"
+            examples:
+              basic_comparison:
+                summary: Compare two analyses
+                value:
+                  analysisIds: ["analysis_123", "analysis_456"]
+              advanced_comparison:
+                summary: Compare with options
+                value:
+                  analysisIds: ["analysis_123", "analysis_456", "analysis_789"]
+                  options:
+                    metrics: ["sentiment", "emotions", "themes"]
+                    includeTrends: true
+                    includeRecommendations: true
+      responses:
+        "200":
+          description: Comparison completed successfully
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/ApiResponse"
+                  - type: object
+                    properties:
+                      data:
+                        $ref: "#/components/schemas/ComparisonResponse"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/AuthenticationError"
+
+  # Health Check Endpoint
+  /health:
+    get:
+      tags:
+        - System
+      summary: System health check
+      description: Returns system health status and component availability
+      operationId: healthCheck
+      responses:
+        "200":
+          description: System is healthy
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthCheckResponse"
+        "503":
+          description: System is unhealthy
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthCheckResponse"
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: JWT token obtained from login endpoint
+
+  schemas:
+    # Enums
+    Platform:
+      type: string
+      enum: [YOUTUBE, INSTAGRAM, TWITTER, TIKTOK]
+      description: Supported social media platforms
+
+    Sentiment:
+      type: string
+      enum: [POSITIVE, NEGATIVE, NEUTRAL]
+      description: Sentiment classification categories
+
+    # Base Types
+    ApiResponse:
+      type: object
+      required:
+        - success
+      properties:
+        success:
+          type: boolean
+          description: Indicates if the request was successful
+        message:
+          type: string
+          description: Optional message providing additional context
+        correlationId:
+          type: string
+          description: Request correlation ID for debugging
+        timestamp:
+          type: string
+          format: date-time
+          description: Response timestamp
+
+    ApiError:
+      type: object
+      required:
+        - message
+        - code
+        - status
+      properties:
+        message:
+          type: string
+          description: Human-readable error message
+        code:
+          type: string
+          description: Machine-readable error code
+        status:
+          type: integer
+          description: HTTP status code
+        details:
+          type: object
+          description: Additional error details
+        correlationId:
+          type: string
+          description: Request correlation ID for debugging
+        userMessage:
+          type: string
+          description: User-friendly error message
+        fieldErrors:
+          type: object
+          additionalProperties:
+            type: array
+            items:
+              type: string
+          description: Field-specific validation errors
+
+    PaginationMeta:
+      type: object
+      required:
+        - page
+        - limit
+        - total
+        - totalPages
+        - hasNext
+        - hasPrev
+      properties:
+        page:
+          type: integer
+          minimum: 1
+          description: Current page number
+        limit:
+          type: integer
+          minimum: 1
+          description: Number of items per page
+        total:
+          type: integer
+          minimum: 0
+          description: Total number of items
+        totalPages:
+          type: integer
+          minimum: 0
+          description: Total number of pages
+        hasNext:
+          type: boolean
+          description: Whether there are more items after current page
+        hasPrev:
+          type: boolean
+          description: Whether there are items before current page
+        nextCursor:
+          type: string
+          description: Cursor for next page (cursor-based pagination)
+        prevCursor:
+          type: string
+          description: Cursor for previous page (cursor-based pagination)
+
+    # Authentication Types
+    RegisterRequest:
+      type: object
+      required:
+        - email
+        - password
+      properties:
+        email:
+          type: string
+          format: email
+          description: User's email address
+          example: "user@example.com"
+        password:
+          type: string
+          minLength: 8
+          description: User's password (must meet security requirements)
+          example: "SecurePass123!"
+        firstName:
+          type: string
+          maxLength: 50
+          description: User's first name
+          example: "John"
+        lastName:
+          type: string
+          maxLength: 50
+          description: User's last name
+          example: "Doe"
+
+    LoginRequest:
+      type: object
+      required:
+        - email
+        - password
+      properties:
+        email:
+          type: string
+          format: email
+          description: User's email address
+          example: "user@example.com"
+        password:
+          type: string
+          description: User's password
+          example: "SecurePass123!"
+
+    UpdateProfileRequest:
+      type: object
+      properties:
+        email:
+          type: string
+          format: email
+          description: Updated email address
+        firstName:
+          type: string
+          maxLength: 50
+          description: Updated first name
+        lastName:
+          type: string
+          maxLength: 50
+          description: Updated last name
+
+    AuthResponse:
+      type: object
+      required:
+        - user
+        - token
+        - expiresAt
+      properties:
+        user:
+          $ref: "#/components/schemas/User"
+        token:
+          type: string
+          description: JWT access token
+          example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+        expiresAt:
+          type: string
+          format: date-time
+          description: Token expiration timestamp
+
+    User:
+      type: object
+      required:
+        - id
+        - email
+        - createdAt
+        - updatedAt
+        - emailVerified
+      properties:
+        id:
+          type: string
+          description: Unique user identifier
+          example: "user_123"
+        email:
+          type: string
+          format: email
+          description: User's email address
+          example: "user@example.com"
+        firstName:
+          type: string
+          description: User's first name
+          example: "John"
+        lastName:
+          type: string
+          description: User's last name
+          example: "Doe"
+        createdAt:
+          type: string
+          format: date-time
+          description: Account creation timestamp
+        updatedAt:
+          type: string
+          format: date-time
+          description: Last profile update timestamp
+        lastLoginAt:
+          type: string
+          format: date-time
+          description: Last login timestamp
+        emailVerified:
+          type: boolean
+          description: Whether email is verified
+
+    # Platform Types
+    OAuthInitiationResponse:
+      type: object
+      required:
+        - authUrl
+        - state
+        - platform
+      properties:
+        authUrl:
+          type: string
+          format: uri
+          description: OAuth authorization URL
+          example: "https://accounts.google.com/oauth/authorize?client_id=..."
+        state:
+          type: string
+          description: OAuth state parameter for CSRF protection
+        platform:
+          $ref: "#/components/schemas/Platform"
+
+    ConnectedPlatformResponse:
+      type: object
+      required:
+        - id
+        - platform
+        - platformUserId
+        - connectedAt
+        - isActive
+        - status
+      properties:
+        id:
+          type: string
+          description: Unique platform connection identifier
+        platform:
+          $ref: "#/components/schemas/Platform"
+        platformUserId:
+          type: string
+          description: User ID on the connected platform
+        platformUsername:
+          type: string
+          description: Platform username or handle
+        platformDisplayName:
+          type: string
+          description: Platform display name
+        connectedAt:
+          type: string
+          format: date-time
+          description: Connection establishment timestamp
+        lastSyncAt:
+          type: string
+          format: date-time
+          description: Last successful data sync timestamp
+        isActive:
+          type: boolean
+          description: Whether the connection is currently active
+        tokenExpiresAt:
+          type: string
+          format: date-time
+          description: Token expiration timestamp
+        status:
+          type: string
+          enum: [active, expired, error, revoked]
+          description: Connection health status
+        errorMessage:
+          type: string
+          description: Error message if connection has issues
+
+    PlatformConnectionSummary:
+      type: object
+      required:
+        - totalConnected
+        - activeConnections
+        - errorConnections
+        - platforms
+      properties:
+        totalConnected:
+          type: integer
+          description: Total number of connected platforms
+        activeConnections:
+          type: integer
+          description: Number of active connections
+        errorConnections:
+          type: integer
+          description: Number of connections with errors
+        platforms:
+          type: array
+          items:
+            $ref: "#/components/schemas/ConnectedPlatformResponse"
+
+    # Post Types
+    PostResponse:
+      type: object
+      required:
+        - id
+        - platform
+        - platformPostId
+        - title
+        - url
+        - publishedAt
+        - createdAt
+        - hasAnalysis
+      properties:
+        id:
+          type: string
+          description: Unique post identifier
+        platform:
+          $ref: "#/components/schemas/Platform"
+        platformPostId:
+          type: string
+          description: Platform-specific post ID
+        title:
+          type: string
+          description: Post title or caption
+        url:
+          type: string
+          format: uri
+          description: Direct URL to the post
+        publishedAt:
+          type: string
+          format: date-time
+          description: Post publication timestamp
+        createdAt:
+          type: string
+          format: date-time
+          description: Post creation in our system timestamp
+        thumbnailUrl:
+          type: string
+          format: uri
+          description: Post thumbnail URL
+        description:
+          type: string
+          description: Post description or excerpt
+        viewCount:
+          type: integer
+          description: Number of views (if available)
+        likeCount:
+          type: integer
+          description: Number of likes
+        commentCount:
+          type: integer
+          description: Number of comments
+        hasAnalysis:
+          type: boolean
+          description: Whether post has been analyzed
+        latestAnalysisId:
+          type: string
+          description: Most recent analysis ID
+
+    PaginatedPostResponse:
+      type: object
+      required:
+        - items
+        - pagination
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/PostResponse"
+        pagination:
+          $ref: "#/components/schemas/PaginationMeta"
+
+    # Analysis Types
+    StartAnalysisRequest:
+      type: object
+      required:
+        - postId
+      properties:
+        postId:
+          type: string
+          description: Post ID to analyze
+        options:
+          $ref: "#/components/schemas/AnalysisOptions"
+
+    AnalysisOptions:
+      type: object
+      properties:
+        includeSpamDetection:
+          type: boolean
+          default: true
+          description: Whether to include spam detection
+        includeToxicityFilter:
+          type: boolean
+          default: true
+          description: Whether to include toxicity filtering
+        maxComments:
+          type: integer
+          minimum: 1
+          maximum: 10000
+          default: 1000
+          description: Maximum number of comments to analyze
+        minCommentLength:
+          type: integer
+          minimum: 1
+          default: 5
+          description: Minimum comment length to include
+        includeLanguages:
+          type: array
+          items:
+            type: string
+          description: Languages to include (ISO codes)
+        includeReplies:
+          type: boolean
+          default: true
+          description: Whether to analyze comment replies
+        sentimentModel:
+          type: string
+          enum: [standard, enhanced, multilingual]
+          default: standard
+          description: Sentiment analysis model to use
+
+    AnalysisJobResponse:
+      type: object
+      required:
+        - id
+        - postId
+        - status
+        - progress
+        - currentStep
+        - totalSteps
+        - stepDescription
+        - createdAt
+      properties:
+        id:
+          type: string
+          description: Unique job identifier
+        postId:
+          type: string
+          description: Post being analyzed
+        status:
+          type: string
+          enum: [pending, processing, completed, failed, cancelled]
+          description: Job status
+        progress:
+          type: integer
+          minimum: 0
+          maximum: 100
+          description: Progress percentage
+        currentStep:
+          type: integer
+          description: Current processing step
+        totalSteps:
+          type: integer
+          description: Total number of steps
+        stepDescription:
+          type: string
+          description: Description of current step
+        createdAt:
+          type: string
+          format: date-time
+          description: Job creation timestamp
+        startedAt:
+          type: string
+          format: date-time
+          description: Job start timestamp
+        completedAt:
+          type: string
+          format: date-time
+          description: Job completion timestamp
+        error:
+          type: string
+          description: Error message (if failed)
+        estimatedCompletionAt:
+          type: string
+          format: date-time
+          description: Estimated completion time
+        analysisResultId:
+          type: string
+          description: Analysis result ID (if completed)
+
+    AnalysisResultResponse:
+      type: object
+      required:
+        - id
+        - totalComments
+        - filteredComments
+        - summary
+        - analyzedAt
+        - sentimentBreakdown
+        - emotions
+        - themes
+        - keywords
+      properties:
+        id:
+          type: string
+          description: Unique analysis result identifier
+        post:
+          $ref: "#/components/schemas/PostResponse"
+        totalComments:
+          type: integer
+          description: Total number of comments analyzed
+        filteredComments:
+          type: integer
+          description: Number of comments filtered out
+        summary:
+          type: string
+          description: AI-generated summary of sentiment
+        analyzedAt:
+          type: string
+          format: date-time
+          description: Analysis completion timestamp
+        sentimentBreakdown:
+          $ref: "#/components/schemas/SentimentBreakdownResponse"
+        emotions:
+          type: array
+          items:
+            $ref: "#/components/schemas/EmotionResponse"
+        themes:
+          type: array
+          items:
+            $ref: "#/components/schemas/ThemeResponse"
+        keywords:
+          type: array
+          items:
+            $ref: "#/components/schemas/KeywordResponse"
+
+    SentimentBreakdownResponse:
+      type: object
+      required:
+        - positive
+        - negative
+        - neutral
+        - confidenceScore
+      properties:
+        positive:
+          type: number
+          minimum: 0
+          maximum: 100
+          description: Percentage of positive comments
+        negative:
+          type: number
+          minimum: 0
+          maximum: 100
+          description: Percentage of negative comments
+        neutral:
+          type: number
+          minimum: 0
+          maximum: 100
+          description: Percentage of neutral comments
+        confidenceScore:
+          type: number
+          minimum: 0
+          maximum: 1
+          description: Overall confidence score
+        trend:
+          type: string
+          enum: [improving, declining, stable]
+          description: Sentiment trend direction
+        comparisonToAverage:
+          type: number
+          description: Comparison to user's average
+
+    EmotionResponse:
+      type: object
+      required:
+        - name
+        - percentage
+        - category
+      properties:
+        name:
+          type: string
+          description: Emotion name
+          example: "joy"
+        percentage:
+          type: number
+          minimum: 0
+          maximum: 100
+          description: Emotion intensity percentage
+        exampleComments:
+          type: array
+          items:
+            type: string
+          description: Representative comments for this emotion
+        category:
+          type: string
+          enum: [positive, negative, neutral]
+          description: Emotion category
+
+    ThemeResponse:
+      type: object
+      required:
+        - name
+        - frequency
+        - sentiment
+        - exampleComments
+        - relevanceScore
+      properties:
+        name:
+          type: string
+          description: Theme name or topic
+        frequency:
+          type: integer
+          description: Number of comments in this theme
+        sentiment:
+          $ref: "#/components/schemas/Sentiment"
+        exampleComments:
+          type: array
+          items:
+            type: string
+          description: Representative comments
+        relevanceScore:
+          type: number
+          minimum: 0
+          maximum: 1
+          description: Theme relevance score
+        relatedKeywords:
+          type: array
+          items:
+            type: string
+          description: Related keywords
+
+    KeywordResponse:
+      type: object
+      required:
+        - word
+        - frequency
+        - sentiment
+        - contexts
+        - importance
+      properties:
+        word:
+          type: string
+          description: The keyword or phrase
+        frequency:
+          type: integer
+          description: Frequency of occurrence
+        sentiment:
+          $ref: "#/components/schemas/Sentiment"
+        contexts:
+          type: array
+          items:
+            type: string
+          description: Context examples where keyword appears
+        importance:
+          type: number
+          minimum: 0
+          maximum: 1
+          description: Keyword importance score
+        relatedWords:
+          type: array
+          items:
+            type: string
+          description: Related keywords
+
+    # Export Types
+    ExportAnalysisRequest:
+      type: object
+      required:
+        - format
+      properties:
+        format:
+          type: string
+          enum: [pdf, csv, json, xlsx, png, svg]
+          description: Export format
+        options:
+          $ref: "#/components/schemas/ExportOptions"
+
+    ExportOptions:
+      type: object
+      properties:
+        includeRawData:
+          type: boolean
+          default: false
+          description: Whether to include raw comment data
+        includeCharts:
+          type: boolean
+          default: true
+          description: Whether to include charts and visualizations
+        includeDetails:
+          type: boolean
+          default: true
+          description: Whether to include detailed breakdowns
+        branding:
+          type: object
+          properties:
+            companyName:
+              type: string
+              description: Company/user name
+            logoUrl:
+              type: string
+              format: uri
+              description: Logo URL
+            colors:
+              type: object
+              properties:
+                primary:
+                  type: string
+                  description: Primary color
+                secondary:
+                  type: string
+                  description: Secondary color
+
+    ExportResponse:
+      type: object
+      required:
+        - exportId
+        - downloadUrl
+        - fileName
+        - fileSize
+        - format
+        - createdAt
+        - expiresAt
+      properties:
+        exportId:
+          type: string
+          description: Unique export identifier
+        downloadUrl:
+          type: string
+          format: uri
+          description: Download URL (expires after 24 hours)
+        fileName:
+          type: string
+          description: File name
+        fileSize:
+          type: integer
+          description: File size in bytes
+        format:
+          type: string
+          description: Export format
+        createdAt:
+          type: string
+          format: date-time
+          description: Export creation timestamp
+        expiresAt:
+          type: string
+          format: date-time
+          description: Download URL expiration timestamp
+
+    # Comparison Types
+    CompareAnalysesRequest:
+      type: object
+      required:
+        - analysisIds
+      properties:
+        analysisIds:
+          type: array
+          items:
+            type: string
+          minItems: 2
+          maxItems: 10
+          description: Array of analysis IDs to compare
+        options:
+          type: object
+          properties:
+            metrics:
+              type: array
+              items:
+                type: string
+                enum: [sentiment, emotions, themes, keywords, engagement]
+              description: Metrics to compare
+            includeTrends:
+              type: boolean
+              default: true
+              description: Whether to include trend analysis
+            includeRecommendations:
+              type: boolean
+              default: true
+              description: Whether to include recommendations
+
+    ComparisonResponse:
+      type: object
+      required:
+        - analyses
+        - insights
+        - trends
+        - recommendations
+      properties:
+        analyses:
+          type: array
+          items:
+            $ref: "#/components/schemas/AnalysisResultResponse"
+        insights:
+          type: object
+          properties:
+            bestPerforming:
+              type: string
+              description: Best performing analysis ID
+            worstPerforming:
+              type: string
+              description: Worst performing analysis ID
+            averageSentiment:
+              type: number
+              description: Average sentiment across all analyses
+            sentimentVariance:
+              type: number
+              description: Sentiment variance
+            commonThemes:
+              type: array
+              items:
+                type: string
+              description: Common themes across analyses
+            uniqueThemes:
+              type: object
+              additionalProperties:
+                type: array
+                items:
+                  type: string
+              description: Unique themes per analysis
+            engagementCorrelation:
+              type: number
+              description: Engagement correlation with sentiment
+        trends:
+          type: object
+          properties:
+            sentimentTrend:
+              type: string
+              enum: [improving, declining, stable]
+              description: Sentiment trend direction
+            engagementTrend:
+              type: string
+              enum: [increasing, decreasing, stable]
+              description: Engagement trend direction
+            confidence:
+              type: number
+              minimum: 0
+              maximum: 1
+              description: Trend confidence score
+            drivers:
+              type: array
+              items:
+                type: string
+              description: Key trend drivers
+        recommendations:
+          type: array
+          items:
+            type: string
+          description: AI-generated recommendations
+
+    # System Types
+    HealthCheckResponse:
+      type: object
+      required:
+        - status
+        - timestamp
+        - components
+      properties:
+        status:
+          type: string
+          enum: [healthy, degraded, unhealthy]
+          description: Overall system status
+        timestamp:
+          type: string
+          format: date-time
+          description: Health check timestamp
+        components:
+          type: object
+          properties:
+            database:
+              $ref: "#/components/schemas/ComponentHealth"
+            redis:
+              $ref: "#/components/schemas/ComponentHealth"
+            aiServices:
+              $ref: "#/components/schemas/ComponentHealth"
+            socialMediaApis:
+              type: object
+              additionalProperties:
+                $ref: "#/components/schemas/ComponentHealth"
+
+    ComponentHealth:
+      type: object
+      required:
+        - status
+        - lastCheck
+      properties:
+        status:
+          type: string
+          enum: [healthy, degraded, unhealthy]
+          description: Component status
+        responseTime:
+          type: number
+          description: Response time in milliseconds
+        error:
+          type: string
+          description: Error message if unhealthy
+        lastCheck:
+          type: string
+          format: date-time
+          description: Last check timestamp
+
+  responses:
+    ValidationError:
+      description: Request validation failed
+      content:
+        application/json:
+          schema:
+            allOf:
+              - $ref: "#/components/schemas/ApiResponse"
+              - type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: false
+                  error:
+                    $ref: "#/components/schemas/ApiError"
+          examples:
+            validation_error:
+              summary: Validation error example
+              value:
+                success: false
+                error:
+                  message: "Validation failed"
+                  code: "VALIDATION_ERROR"
+                  status: 400
+                  fieldErrors:
+                    email: ["Email is required", "Email format is invalid"]
+                    password: ["Password must be at least 8 characters"]
+
+    AuthenticationError:
+      description: Authentication required
+      content:
+        application/json:
+          schema:
+            allOf:
+              - $ref: "#/components/schemas/ApiResponse"
+              - type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: false
+                  error:
+                    $ref: "#/components/schemas/ApiError"
+          examples:
+            auth_error:
+              summary: Authentication error
+              value:
+                success: false
+                error:
+                  message: "Authentication required"
+                  code: "AUTHENTICATION_ERROR"
+                  status: 401
+                  userMessage: "Please log in to continue"
+
+    ConflictError:
+      description: Resource conflict
+      content:
+        application/json:
+          schema:
+            allOf:
+              - $ref: "#/components/schemas/ApiResponse"
+              - type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: false
+                  error:
+                    $ref: "#/components/schemas/ApiError"
+
+    NotFoundError:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            allOf:
+              - $ref: "#/components/schemas/ApiResponse"
+              - type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: false
+                  error:
+                    $ref: "#/components/schemas/ApiError"
+
+    RateLimitError:
+      description: Rate limit exceeded
+      content:
+        application/json:
+          schema:
+            allOf:
+              - $ref: "#/components/schemas/ApiResponse"
+              - type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: false
+                  error:
+                    $ref: "#/components/schemas/ApiError"
+      headers:
+        X-RateLimit-Limit:
+          description: Request limit per time window
+          schema:
+            type: integer
+        X-RateLimit-Remaining:
+          description: Remaining requests in current window
+          schema:
+            type: integer
+        X-RateLimit-Reset:
+          description: Time when rate limit resets (Unix timestamp)
+          schema:
+            type: integer
+        Retry-After:
+          description: Seconds to wait before retrying
+          schema:
+            type: integer
+
+tags:
+  - name: Authentication
+    description: User authentication and profile management
+  - name: Platforms
+    description: Social media platform connections and OAuth
+  - name: Posts
+    description: Social media post management and retrieval
+  - name: Analysis
+    description: Sentiment analysis operations and results
+  - name: Export
+    description: Analysis result export functionality
+  - name: System
+    description: System health and monitoring endpoints

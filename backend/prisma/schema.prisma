@@ -1,0 +1,240 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+// Seed configuration
+// Run with: npm run prisma:seed
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_DATABASE_URL")
+}
+
+model User {
+  id                        String              @id @default(cuid())
+  email                     String              @unique
+  password                  String              // hashed password
+  firstName                 String?
+  lastName                  String?
+  emailVerified             Boolean             @default(false)
+  emailVerificationToken    String?
+  emailVerificationExpires  DateTime?
+  lastLoginAt               DateTime?
+  createdAt                 DateTime            @default(now())
+  updatedAt                 DateTime            @updatedAt
+  connectedPlatforms        ConnectedPlatform[]
+  posts                     Post[]
+  analysisResults           AnalysisResult[]
+  analysisJobs              AnalysisJob[]
+  sessions                  UserSession[]
+
+  @@index([email])
+  @@index([createdAt])
+  @@index([lastLoginAt])
+  @@index([emailVerificationToken])
+  @@index([emailVerificationExpires])
+  @@map("users")
+}
+
+model UserSession {
+  id        String   @id @default(cuid())
+  token     String   @unique
+  userId    String
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([token])
+  @@index([expiresAt])
+  @@map("user_sessions")
+}
+
+model ConnectedPlatform {
+  id              String   @id @default(cuid())
+  platform        Platform
+  platformUserId  String
+  accessToken     String   // encrypted
+  refreshToken    String?  // encrypted
+  tokenExpiresAt  DateTime?
+  connectedAt     DateTime @default(now())
+  userId          String
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, platform])
+  @@index([userId])
+  @@index([platform])
+  @@index([tokenExpiresAt])
+  @@map("connected_platforms")
+}
+
+model Post {
+  id               String           @id @default(cuid())
+  platform         Platform
+  platformPostId   String
+  title            String
+  url              String
+  publishedAt      DateTime
+  createdAt        DateTime         @default(now())
+  userId           String
+  user             User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  comments         Comment[]
+  analysisResults  AnalysisResult[]
+  analysisJobs     AnalysisJob[]
+
+  @@unique([platform, platformPostId])
+  @@index([userId])
+  @@index([platform])
+  @@index([publishedAt])
+  @@index([createdAt])
+  @@map("posts")
+}
+
+model Comment {
+  id                String   @id @default(cuid())
+  platformCommentId String
+  text              String
+  authorName        String
+  publishedAt       DateTime
+  likeCount         Int      @default(0)
+  isFiltered        Boolean  @default(false)
+  filterReason      String?
+  createdAt         DateTime @default(now())
+  postId            String
+  post              Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  @@unique([postId, platformCommentId])
+  @@index([postId])
+  @@index([publishedAt])
+  @@index([isFiltered])
+  @@index([authorName])
+  @@map("comments")
+}
+
+model AnalysisJob {
+  id              String         @id @default(cuid())
+  status          JobStatus      @default(PENDING)
+  progress        Float          @default(0)
+  totalSteps      Int            @default(0)
+  currentStep     Int            @default(0)
+  stepDescription String?
+  errorMessage    String?
+  retryCount      Int            @default(0)
+  maxRetries      Int            @default(3)
+  createdAt       DateTime       @default(now())
+  startedAt       DateTime?
+  completedAt     DateTime?
+  postId          String
+  userId          String
+  post            Post           @relation(fields: [postId], references: [id], onDelete: Cascade)
+  user            User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  analysisResult  AnalysisResult?
+
+  @@index([userId])
+  @@index([postId])
+  @@index([status])
+  @@index([createdAt])
+  @@map("analysis_jobs")
+}
+
+model AnalysisResult {
+  id                String              @id @default(cuid())
+  totalComments     Int
+  filteredComments  Int
+  summary           String
+  analyzedAt        DateTime            @default(now())
+  postId            String
+  userId            String
+  jobId             String?             @unique
+  post              Post                @relation(fields: [postId], references: [id], onDelete: Cascade)
+  user              User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  job               AnalysisJob?        @relation(fields: [jobId], references: [id], onDelete: SetNull)
+  sentimentBreakdown SentimentBreakdown?
+  emotions          Emotion[]
+  themes            Theme[]
+  keywords          Keyword[]
+
+  @@index([userId])
+  @@index([postId])
+  @@index([analyzedAt])
+  @@index([jobId])
+  @@map("analysis_results")
+}
+
+model SentimentBreakdown {
+  id              String         @id @default(cuid())
+  positive        Float
+  negative        Float
+  neutral         Float
+  confidenceScore Float
+  analysisResultId String        @unique
+  analysisResult  AnalysisResult @relation(fields: [analysisResultId], references: [id], onDelete: Cascade)
+
+  @@map("sentiment_breakdowns")
+}
+
+model Emotion {
+  id               String         @id @default(cuid())
+  name             String
+  percentage       Float
+  analysisResultId String
+  analysisResult   AnalysisResult @relation(fields: [analysisResultId], references: [id], onDelete: Cascade)
+
+  @@map("emotions")
+}
+
+model Theme {
+  id               String         @id @default(cuid())
+  name             String
+  frequency        Int
+  sentiment        Sentiment
+  exampleComments  String[]
+  analysisResultId String
+  analysisResult   AnalysisResult @relation(fields: [analysisResultId], references: [id], onDelete: Cascade)
+
+  @@index([analysisResultId])
+  @@index([sentiment])
+  @@index([frequency])
+  @@map("themes")
+}
+
+model Keyword {
+  id               String         @id @default(cuid())
+  word             String
+  frequency        Int
+  sentiment        Sentiment
+  contexts         String[]
+  analysisResultId String
+  analysisResult   AnalysisResult @relation(fields: [analysisResultId], references: [id], onDelete: Cascade)
+
+  @@index([analysisResultId])
+  @@index([word])
+  @@index([sentiment])
+  @@index([frequency])
+  @@map("keywords")
+}
+
+enum Platform {
+  YOUTUBE
+  INSTAGRAM
+  TWITTER
+  TIKTOK
+}
+
+enum Sentiment {
+  POSITIVE
+  NEGATIVE
+  NEUTRAL
+}
+
+enum JobStatus {
+  PENDING
+  RUNNING
+  COMPLETED
+  FAILED
+  CANCELLED
+}

@@ -1,0 +1,53 @@
+import { Platform } from "@prisma/client";
+import { ISocialMediaService } from "../../types/socialMedia";
+import { youtubeService } from "./youtubeService";
+import { instagramService } from "./instagramService";
+import { twitterService } from "./twitterService";
+import { tiktokService } from "./tiktokService";
+
+/**
+ * Factory class to get the appropriate social media service based on platform
+ */
+export class SocialMediaServiceFactory {
+  /**
+   * Get the social media service for a specific platform
+   */
+  static getService(platform: Platform): ISocialMediaService {
+    switch (platform) {
+      case Platform.YOUTUBE:
+        return youtubeService.instance;
+      case Platform.INSTAGRAM:
+        return instagramService.instance;
+      case Platform.TWITTER:
+        return twitterService.instance;
+      case Platform.TIKTOK:
+        return tiktokService.instance;
+      default:
+        throw new Error(`Unsupported platform: ${platform}`);
+    }
+  }
+
+  /**
+   * Get all available social media services
+   */
+  static getAllServices(): ISocialMediaService[] {
+    return [youtubeService.instance, instagramService.instance, twitterService.instance, tiktokService.instance];
+  }
+
+  /**
+   * Get all supported platforms
+   */
+  static getSupportedPlatforms(): Platform[] {
+    return [Platform.YOUTUBE, Platform.INSTAGRAM, Platform.TWITTER, Platform.TIKTOK];
+  }
+
+  /**
+   * Check if a platform is supported
+   */
+  static isPlatformSupported(platform: string): boolean {
+    return Object.values(Platform).includes(platform as Platform);
+  }
+}
+
+// Export singleton instance
+export const socialMediaServiceFactory = SocialMediaServiceFactory;
