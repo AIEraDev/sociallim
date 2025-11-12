@@ -1,32 +1,22 @@
 "use client";
 
-/**
- * Sociallim Dashboard - Redesigned for Comment Analysis
- *
- * New Layout Structure:
- * 1. Global Header/Controls - Live indicator, platform selector, post search, real-time toggle
- * 2. KPI Strip - Total comments, sentiment snapshot, engagement rate, alerts, last analysis
- * 3. Three-column layout:
- *    - Left: Recent Posts/Active Streams list
- *    - Center: Post Analysis (primary workspace)
- *    - Right: Derived analytics & controls
- */
+/*** Sociallim Dashboard - Redesigned for Comment Analysis ***/
 
 import { useState } from "react";
-import { motion } from "framer-motion";
-import { Search, RefreshCw, Plus, Download, Save, ExternalLink, AlertTriangle, MessageSquare, Eye, BarChart3, Tag, Shield } from "lucide-react";
+
+import { RefreshCw, Plus, Download, Save, ExternalLink, AlertTriangle, MessageSquare, BarChart3, Tag, Shield } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+
 import { Switch } from "@/components/ui/switch";
-import { Separator } from "@/components/ui/separator";
 import { Progress } from "@/components/ui/progress";
 
 import AppLayout from "@/components/AppLayout";
-import { ConnectSocialModal } from "@/components/modals/ConnectSocialModal";
+import GlobalHeader from "@/components/GlobalHeader";
+import RecentPosts from "@/components/dashboard/RecentPosts";
+import { usePlatformStore } from "@/stores/platformStore";
 
 // Mock data for the redesigned dashboard
 const mockKPIData = {
@@ -36,42 +26,6 @@ const mockKPIData = {
   alerts: { count: 3, unread: 2 },
   lastAnalysis: { timestamp: "2 minutes ago", model: "v2.1.3" },
 };
-
-const mockRecentPosts = [
-  {
-    id: 1,
-    title: "How to Create Amazing Content in 2024",
-    platform: "YouTube",
-    thumbnail: "/api/placeholder/60/60",
-    publishDate: "2 hours ago",
-    commentsCount: 1247,
-    sentimentPercent: 72,
-    status: "Live" as const,
-    cacheExpiry: null,
-  },
-  {
-    id: 2,
-    title: "Behind the Scenes: Our Creative Process",
-    platform: "Instagram",
-    thumbnail: "/api/placeholder/60/60",
-    publishDate: "5 hours ago",
-    commentsCount: 856,
-    sentimentPercent: 65,
-    status: "Cached" as const,
-    cacheExpiry: "14h",
-  },
-  {
-    id: 3,
-    title: "Product Launch: Revolutionary Features",
-    platform: "Twitter",
-    thumbnail: "/api/placeholder/60/60",
-    publishDate: "1 day ago",
-    commentsCount: 432,
-    sentimentPercent: 58,
-    status: "No cache" as const,
-    cacheExpiry: null,
-  },
-];
 
 const mockSelectedPost = {
   id: 1,
@@ -124,11 +78,8 @@ const mockAnalytics = {
 };
 
 export default function DashboardPage() {
-  const [selectedPost, setSelectedPost] = useState<number | null>(1); // Default to first post
-  const [isLiveMode, setIsLiveMode] = useState(true);
-  const [selectedPlatform, setSelectedPlatform] = useState("all");
-  const [searchQuery, setSearchQuery] = useState("");
-  const [isConnectModalOpen, setIsConnectModalOpen] = useState(false);
+  const [selectedPost] = useState<number | null>(1); // Default to first post
+  const { setIsConnectModalOpen } = usePlatformStore();
 
   // Toggle this to test first-time user experience
   const [isFirstTimeUser, setIsFirstTimeUser] = useState(true);
@@ -148,77 +99,7 @@ export default function DashboardPage() {
     <AppLayout>
       <div className="transition-all duration-300">
         {/* Global Header / Controls */}
-        <div className="border-b border-white/10 bg-black/20 backdrop-blur-sm">
-          <div className="w-full mx-auto py-4">
-            <div className="flex flex-col lg:flex-row lg:justify-between lg:items-center gap-4 px-4">
-              {/* Live Indicator & Platform Selector */}
-              <div className="flex items-center gap-4 relative">
-                <Select value={selectedPlatform} onValueChange={setSelectedPlatform}>
-                  <SelectTrigger className="w-32 bg-white/5 border-white/10 cursor-pointer py-1">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent className="bg-(--vr-bg)">
-                    <SelectItem value="all" className="hover:bg-white/5 transition-colors duration-300 cursor-pointer">
-                      All Platforms
-                    </SelectItem>
-                    <SelectItem value="youtube" className="hover:bg-white/5  transition-colors duration-300 cursor-pointer">
-                      YouTube
-                    </SelectItem>
-                    <SelectItem value="instagram" className="hover:bg-white/5  transition-colors duration-300 cursor-pointer">
-                      Instagram
-                    </SelectItem>
-                    <SelectItem value="twitter" className="hover:bg-white/5  transition-colors duration-300 cursor-pointer">
-                      Twitter
-                    </SelectItem>
-                    <SelectItem value="tiktok" className="hover:bg-white/5  transition-colors duration-300 cursor-pointer">
-                      TikTok
-                    </SelectItem>
-                  </SelectContent>
-                </Select>
-                <div className={`absolute -top-0.5 -right-0.5 w-2 h-2 transition-colors duration-300 rounded-full ${isLiveMode ? "bg-green-500" : "bg-red-500"}`} />
-              </div>
-
-              {/* Post Search */}
-              <div className="flex-1 max-w-md">
-                <div className="relative">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
-                  <Input placeholder="Search by title, URL, or ID..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="pl-10 bg-white/5 border-white/10 text-white placeholder:text-gray-400" />
-                </div>
-              </div>
-
-              {/* Real-time Toggle & Quick Actions */}
-              <div className="flex items-center gap-3">
-                <div className="flex items-center gap-2">
-                  <span className="text-sm text-gray-300">Live Mode</span>
-                  <Switch checked={isLiveMode} onCheckedChange={setIsLiveMode} />
-                </div>
-                <Separator orientation="vertical" className="h-6 bg-white/10" />
-                <Button size="sm" className="bg-blue-600 hover:bg-blue-700">
-                  <Plus className="w-4 h-4 mr-2" />
-                  New Analysis
-                </Button>
-                <Button size="sm" variant="outline" className="border-white/10 bg-white/5 text-white hover:bg-white/10">
-                  <Download className="w-4 h-4 mr-2" />
-                  Import Post
-                </Button>
-              </div>
-            </div>
-
-            {/* Cache Status & Last Fetch */}
-            <div className="flex items-center justify-between mt-3 pt-3 border-t border-white/5 px-4">
-              <div className="flex items-center gap-4 text-sm text-gray-400">
-                <span>Last fetch: 2 minutes ago</span>
-                <Badge variant="outline" className="border-green-500/20 bg-green-500/10 text-green-400">
-                  Cache Active
-                </Badge>
-              </div>
-              <Button size="sm" variant="ghost" className="text-gray-400 hover:text-white">
-                <Save className="w-4 h-4 mr-2" />
-                Save Transcript
-              </Button>
-            </div>
-          </div>
-        </div>
+        <GlobalHeader />
 
         {/* KPI Strip */}
         <div className="border-b border-white/10 bg-black/10">
@@ -278,80 +159,13 @@ export default function DashboardPage() {
         </div>
 
         {/* Main Content - Three Column Layout */}
-        <main className="w-full lg:max-w-[calc(100vw-240px)] mx-auto px-4 sm:px-6 py-6">
-          <div className="grid lg:grid-cols-12 gap-6">
+        <main className="w-full px-4 sm:px-6 py-6">
+          <div className="flex gap-4">
             {/* Left Column - Recent Posts/Active Streams */}
-            <div className="lg:col-span-3">
-              <Card className="glass-card border-white/20">
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-white text-lg">Recent Posts</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  {isFirstTimeUser ? (
-                    /* Empty State for First-Time Users */
-                    <div className="text-center py-8">
-                      <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-linear-to-br from-blue-500/20 to-purple-500/20 flex items-center justify-center">
-                        <Plus className="w-8 h-8 text-blue-400" />
-                      </div>
-                      <h3 className="text-white font-medium mb-2">No Posts Yet</h3>
-                      <p className="text-gray-400 text-sm mb-4">Connect your social accounts to start analyzing comments</p>
-                      <div className="space-y-2">
-                        <Button size="sm" className="w-full bg-blue-600 hover:bg-blue-700" onClick={() => setIsConnectModalOpen(true)}>
-                          <Plus className="w-4 h-4 mr-2" />
-                          Connect Social Account
-                        </Button>
-                        <Button size="sm" variant="outline" className="w-full border-white/10 bg-white/5 text-white hover:bg-white/10">
-                          <Download className="w-4 h-4 mr-2" />
-                          Import Post URL
-                        </Button>
-                      </div>
-                    </div>
-                  ) : (
-                    /* Regular Posts List */
-                    mockRecentPosts.map((post) => (
-                      <motion.div key={post.id} className={`p-3 rounded-lg border cursor-pointer transition-all ${selectedPost === post.id ? "border-blue-500/50 bg-blue-500/10" : "border-white/10 bg-white/5 hover:bg-white/10"}`} onClick={() => setSelectedPost(post.id)} whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
-                        <div className="flex gap-3">
-                          <img src={post.thumbnail} alt="" className="w-12 h-12 rounded object-cover" />
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2 mb-1">
-                              <Badge variant="outline" className="text-xs">
-                                {post.platform}
-                              </Badge>
-                              <Badge className={`text-xs ${post.status === "Live" ? "bg-green-500/20 text-green-400" : post.status === "Cached" ? "bg-blue-500/20 text-blue-400" : "bg-gray-500/20 text-gray-400"}`}>
-                                {post.status}
-                                {post.cacheExpiry && ` (${post.cacheExpiry})`}
-                              </Badge>
-                            </div>
-                            <h4 className="text-white text-sm font-medium truncate">{post.title}</h4>
-                            <div className="flex items-center justify-between mt-2 text-xs text-gray-400">
-                              <span>{post.commentsCount} comments</span>
-                              <span>{post.sentimentPercent}% positive</span>
-                            </div>
-                          </div>
-                        </div>
-                        <div className="flex gap-2 mt-3">
-                          <Button size="sm" variant="ghost" className="h-7 px-2 text-xs">
-                            <Eye className="w-3 h-3 mr-1" />
-                            Analysis
-                          </Button>
-                          <Button size="sm" variant="ghost" className="h-7 px-2 text-xs">
-                            <MessageSquare className="w-3 h-3 mr-1" />
-                            Live
-                          </Button>
-                          <Button size="sm" variant="ghost" className="h-7 px-2 text-xs">
-                            <Download className="w-3 h-3 mr-1" />
-                            Export
-                          </Button>
-                        </div>
-                      </motion.div>
-                    ))
-                  )}
-                </CardContent>
-              </Card>
-            </div>
+            <RecentPosts />
 
             {/* Center Column - Post Analysis */}
-            <div className="lg:col-span-6">
+            <div className="w-120">
               {isFirstTimeUser ? (
                 /* First-Time User Onboarding */
                 <Card className="glass-card border-white/20">
@@ -571,7 +385,7 @@ export default function DashboardPage() {
             </div>
 
             {/* Right Column - Analytics & Controls */}
-            <div className="lg:col-span-3 space-y-6">
+            <div className="hidden lg:col-span-3 space-y-6">
               {isFirstTimeUser ? (
                 /* Empty State Analytics */
                 <>
@@ -704,17 +518,6 @@ export default function DashboardPage() {
           </div>
         </main>
       </div>
-
-      {/* Connect Social Modal */}
-      <ConnectSocialModal
-        open={isConnectModalOpen}
-        onOpenChange={setIsConnectModalOpen}
-        onConnect={(platform) => {
-          console.log(`Connected to ${platform}`);
-          // Handle successful connection here
-          // You could update user state, refresh data, etc.
-        }}
-      />
     </AppLayout>
   );
 }

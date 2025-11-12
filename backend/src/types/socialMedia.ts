@@ -118,14 +118,14 @@ export interface TwitterReply {
 
 export interface TikTokVideo {
   id: string;
-  title: string;
-  video_description: string;
+  title?: string;
+  video_description?: string;
   create_time: number;
-  cover_image_url: string;
-  share_url: string;
-  view_count: number;
-  like_count: number;
-  comment_count: number;
+  cover_image_url?: string;
+  share_url?: string; // Optional since TikTok API might not always return this
+  view_count?: number;
+  like_count?: number;
+  comment_count?: number;
 }
 
 export interface TikTokComment {
@@ -178,6 +178,7 @@ export class ApiError extends Error implements ApiErrorData {
 // Base social media service interface
 export interface ISocialMediaService {
   platform: Platform;
+  fetchUserInfo(accessToken: string): Promise<any>;
   fetchUserPosts(
     accessToken: string,
     options?: FetchPostsOptions

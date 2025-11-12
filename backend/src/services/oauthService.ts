@@ -1,7 +1,8 @@
-import prisma from "../config/prisma";
-import { encrypt, decrypt } from "../utils/encryption";
 import { Platform } from "@prisma/client";
 import axios from "axios";
+
+import prisma from "../config/prisma";
+import { encrypt, decrypt } from "../utils/encryption";
 
 export interface OAuthTokenData {
   platform: Platform;
@@ -215,12 +216,20 @@ export class OAuthService {
    * Refresh TikTok token
    */
   private async refreshTikTokToken(refreshToken: string): Promise<TokenRefreshResult> {
-    const response = await axios.post("https://open-api.tiktok.com/oauth/refresh_token/", {
-      client_key: process.env.TIKTOK_CLIENT_ID,
-      client_secret: process.env.TIKTOK_CLIENT_SECRET,
-      refresh_token: refreshToken,
-      grant_type: "refresh_token",
-    });
+    const response = await axios.post(
+      "https://open.tiktokapis.com/v2/oauth/token/",
+      new URLSearchParams({
+        client_key: process.env.TIKTOK_CLIENT_ID!,
+        client_secret: process.env.TIKTOK_CLIENT_SECRET!,
+        refresh_token: refreshToken,
+        grant_type: "refresh_token",
+      }),
+      {
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded",
+        },
+      }
+    );
 
     const { access_token, refresh_token, expires_in } = response.data;
 
@@ -323,10 +332,19 @@ export class OAuthService {
    */
   private async validateTikTokToken(accessToken: string): Promise<boolean> {
     try {
-      const response = await axios.post("https://open-api.tiktok.com/oauth/userinfo/", {
-        access_token: accessToken,
-      });
-      return response.status === 200;
+      const response = await axios.post(
+        "https://open.tiktokapis.com/v2/user/info/",
+        {
+          fields: "open_id,union_id,avatar_url,display_name,bio_description,is_verified,profile_deep_link,follower_count,following_count,likes_count,video_count",
+        },
+        {
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+            "Content-Type": "application/json",
+          },
+        }
+      );
+      return response.status === 200 && !!response.data.data?.user?.open_id;
     } catch (error) {
       return false;
     }

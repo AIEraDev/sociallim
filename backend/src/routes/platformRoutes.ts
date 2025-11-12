@@ -28,6 +28,9 @@ const fetchPostsSchema = Joi.object({
     "number.max": "Limit cannot exceed 50",
   }),
   pageToken: Joi.string().optional(),
+  source: Joi.string().valid("db", "live").default("db").messages({
+    "any.only": "Source must be 'db' (database) or 'live' (fetch fresh from social platform).",
+  }),
 });
 
 const startAnalysisSchema = Joi.object({
@@ -52,14 +55,11 @@ const validatePlatform = (req: Request, res: Response, next: any): void => {
 };
 
 /**
- * GET /platforms/connect/:platform
- * Initiate OAuth connection for a platform
+ * GET /platforms/
+ * Fetch user connected platforms
  */
-router.get("/connect/:platform", authenticateToken, validatePlatform, (req: Request, res: Response): void => {
+router.get("/", authenticateToken, async (req: Request, res: Response): Promise<void> => {
   try {
-    const { platform } = req.params;
-    const platformUpper = platform.toUpperCase() as Platform;
-
     if (!req.user) {
       res.status(401).json({
         error: "Unauthorized",
@@ -68,191 +68,298 @@ router.get("/connect/:platform", authenticateToken, validatePlatform, (req: Requ
       return;
     }
 
-    // Check if platform is supported
-    if (!socialMediaServiceFactory.isPlatformSupported(platformUpper)) {
-      res.status(400).json({
-        error: "Unsupported platform",
-        message: `Platform ${platform} is not supported`,
+    const userId = req.user.id;
+
+    const userConnections = await oauthService.getUserConnections(userId);
+
+    res.status(200).json({
+      message: "Connected platforms fetched successfully",
+      data: userConnections,
+    });
+  } catch (error) {
+    console.error("Error fetching connected platforms:", error);
+    res.status(500).json({
+      error: "Internal server error",
+      message: "An error occurred while fetching connected platforms",
+    });
+  }
+});
+
+/**
+ * GET /platforms/:platform/posts
+ * Fetch user posts from a specific platform
+ * Query params:
+ * - source: 'api' (fetch from social platform) or 'db' (fetch from database) - default: 'db'
+ * - limit: number of posts to fetch (1-50) - default: 20
+ * - pageToken: pagination token for API requests
+ */
+router.get("/:platform/posts", authenticateToken, async (req: Request, res: Response): Promise<void> => {
+  try {
+    if (!req.user) {
+      res.status(401).json({
+        error: "Unauthorized",
+        message: "User not authenticated",
       });
       return;
     }
 
-    // Generate OAuth URL (this would typically redirect to OAuth provider)
-    const oauthUrl = `/api/oauth/connect/${platform}`;
+    // Validate platform parameter
+    const { error: platformError } = platformParamSchema.validate(req.params);
+    if (platformError) {
+      res.status(400).json({
+        error: "Invalid platform",
+        message: platformError.details[0].message,
+      });
+      return;
+    }
+
+    // Validate query parameters
+    const { error: queryError, value } = fetchPostsSchema.validate(req.query);
+    if (queryError) {
+      res.status(400).json({
+        error: "Invalid query parameters",
+        message: queryError.details[0].message,
+      });
+      return;
+    }
+
+    const { limit, pageToken, source } = value;
+    const userId = req.user.id;
+    const platform = req.params.platform.toUpperCase() as Platform;
+
+    // If fetching from database
+    if (source === "db") {
+      const posts = await prisma.post.findMany({
+        where: {
+          userId,
+          platform,
+        },
+        orderBy: {
+          publishedAt: "desc",
+        },
+        take: limit,
+        include: {
+          _count: {
+            select: {
+              comments: true,
+            },
+          },
+        },
+      });
+
+      const formattedPosts = posts.map((post) => ({
+        id: post.platformPostId,
+        title: post.title,
+        url: post.url,
+        publishedAt: post.publishedAt,
+        platform: post.platform,
+        hasComments: post._count.comments > 0,
+        commentsCount: post._count.comments,
+      }));
+
+      res.status(200).json({
+        message: "Posts fetched from database successfully",
+        data: {
+          posts: formattedPosts,
+          source: "database",
+          platform,
+          totalPosts: formattedPosts.length,
+        },
+      });
+      return;
+    }
+
+    // If fetching from API, check OAuth connection
+    const oauthConnection = await oauthService.getConnection(userId, platform);
+
+    if (!oauthConnection) {
+      res.status(400).json({
+        error: "Platform not connected",
+        message: `Please connect your ${platform} account first`,
+      });
+      return;
+    }
+
+    // Check if token is valid and refresh if needed
+    const isTokenValid = await oauthService.validateToken(userId, platform);
+    if (!isTokenValid) {
+      try {
+        await oauthService.refreshToken(userId, platform);
+        const refreshedConnection = await oauthService.getConnection(userId, platform);
+        if (!refreshedConnection) {
+          throw new Error("Failed to refresh token");
+        }
+        oauthConnection.accessToken = refreshedConnection.accessToken;
+      } catch (refreshError) {
+        res.status(401).json({
+          error: "Token expired",
+          message: "OAuth token expired and refresh failed. Please reconnect your account.",
+        });
+        return;
+      }
+    }
+
+    // Get social media service for this platform
+    const service = socialMediaServiceFactory.getService(platform);
+
+    // Fetch posts from the platform API
+    const result = await service.fetchUserPosts(oauthConnection.accessToken, {
+      limit,
+      pageToken,
+    });
+
+    // Store new posts in database
+    const storedPosts = [];
+    for (const post of result.posts) {
+      try {
+        // Check if post already exists
+        const existingPost = await prisma.post.findUnique({
+          where: {
+            platform_platformPostId: {
+              platform,
+              platformPostId: post.id,
+            },
+          },
+        });
+
+        if (!existingPost) {
+          let postUrl: string = post.url;
+
+          // If no URL provided, fetch user info once and generate URL
+          if (!postUrl) {
+            try {
+              const userInfo = await socialMediaServiceFactory.getService(platform).fetchUserInfo(oauthConnection.accessToken);
+              const username = userInfo.username || userInfo.display_name || userInfo.open_id || "user";
+              postUrl = `https://www.tiktok.com/@${username}/video/${post.id}`;
+              console.log("Generated URL with username:", postUrl);
+            } catch (userInfoError) {
+              // Fallback if user info fetch fails
+              console.warn("Failed to fetch user info for URL generation:", userInfoError);
+              postUrl = `https://www.tiktok.com/@user/video/${post.id}`;
+            }
+          }
+
+          // Create new post record
+          await prisma.post.create({
+            data: {
+              platform,
+              platformPostId: post.id,
+              title: post.title || "Untitled Post",
+              url: postUrl,
+              publishedAt: post.publishedAt,
+              userId,
+            },
+          });
+        }
+
+        storedPosts.push({
+          ...post,
+          platform,
+          hasComments: true, // We'll determine this based on actual data later
+        });
+      } catch (dbError) {
+        console.warn(`Failed to store post ${post.id} in database:`, dbError);
+        // Still include in response even if DB storage fails
+        storedPosts.push({
+          ...post,
+          platform,
+          hasComments: true,
+        });
+      }
+    }
 
     res.status(200).json({
-      message: `OAuth initiation for ${platform}`,
+      message: "Posts fetched from platform API successfully",
       data: {
+        posts: storedPosts,
+        source: "live",
         platform,
-        oauthUrl,
-        redirectUrl: `${process.env.FRONTEND_URL}/dashboard?connecting=${platform}`,
+        totalPosts: storedPosts.length,
+        pagination: result.pagination,
       },
     });
   } catch (error: any) {
-    console.error("Platform connection error:", error);
+    console.error(`Error fetching posts from ${req.params.platform}:`, error);
     res.status(500).json({
-      error: "Connection failed",
-      message: "Failed to initiate platform connection",
+      error: "Failed to fetch posts",
+      message: `An error occurred while fetching posts from ${req.params.platform}`,
     });
   }
 });
 
 /**
  * GET /platforms/posts
- * Fetch user posts from connected platforms
+ * Fetch user posts from all connected platforms (legacy endpoint)
  */
-router.get("/posts", authenticateToken, async (req: Request, res: Response): Promise<void> => {
-  try {
-    if (!req.user) {
-      res.status(401).json({
-        error: "Unauthorized",
-        message: "User not authenticated",
-      });
-      return;
-    }
+// router.get("/posts", authenticateToken, async (req: Request, res: Response): Promise<void> => {
+//   try {
+//     if (!req.user) {
+//       res.status(401).json({
+//         error: "Unauthorized",
+//         message: "User not authenticated",
+//       });
+//       return;
+//     }
 
-    const { error, value } = fetchPostsSchema.validate(req.query);
-    if (error) {
-      res.status(400).json({
-        error: "Invalid query parameters",
-        message: error.details[0].message,
-      });
-      return;
-    }
+//     const { error, value } = fetchPostsSchema.validate(req.query);
+//     if (error) {
+//       res.status(400).json({
+//         error: "Invalid query parameters",
+//         message: error.details[0].message,
+//       });
+//       return;
+//     }
 
-    const { limit, pageToken } = value;
-    const userId = req.user.id;
+//     const { limit, source } = value;
+//     const userId = req.user.id;
 
-    // Get user's connected platforms
-    const connections = await oauthService.getUserConnections(userId);
+//     if (source === "db") {
+//       // Fetch from database for all platforms
+//       const posts = await prisma.post.findMany({
+//         where: { userId },
+//         orderBy: { publishedAt: "desc" },
+//         take: limit,
+//         include: {
+//           _count: {
+//             select: { comments: true },
+//           },
+//         },
+//       });
 
-    if (connections.length === 0) {
-      res.status(200).json({
-        message: "No connected platforms found",
-        data: {
-          posts: [],
-          platforms: [],
-        },
-      });
-      return;
-    }
+//       const formattedPosts = posts.map((post) => ({
+//         id: post.platformPostId,
+//         title: post.title,
+//         url: post.url,
+//         publishedAt: post.publishedAt,
+//         platform: post.platform,
+//         hasComments: post._count.comments > 0,
+//         commentsCount: post._count.comments,
+//       }));
 
-    const allPosts: any[] = [];
-    const platformStatuses: any[] = [];
+//       res.status(200).json({
+//         message: "Posts fetched from database successfully",
+//         data: {
+//           posts: formattedPosts,
+//           source: "database",
+//           totalPosts: formattedPosts.length,
+//         },
+//       });
+//       return;
+//     }
 
-    // Fetch posts from each connected platform
-    for (const connection of connections) {
-      try {
-        // Get OAuth connection with decrypted tokens
-        const oauthConnection = await oauthService.getConnection(userId, connection.platform);
-
-        if (!oauthConnection) {
-          platformStatuses.push({
-            platform: connection.platform,
-            status: "disconnected",
-            error: "OAuth connection not found",
-          });
-          continue;
-        }
-
-        // Check if token is valid
-        const isTokenValid = await oauthService.validateToken(userId, connection.platform);
-        if (!isTokenValid) {
-          // Try to refresh token
-          try {
-            await oauthService.refreshToken(userId, connection.platform);
-            const refreshedConnection = await oauthService.getConnection(userId, connection.platform);
-            if (!refreshedConnection) {
-              throw new Error("Failed to refresh token");
-            }
-            oauthConnection.accessToken = refreshedConnection.accessToken;
-          } catch (refreshError) {
-            platformStatuses.push({
-              platform: connection.platform,
-              status: "token_expired",
-              error: "Token expired and refresh failed",
-            });
-            continue;
-          }
-        }
-
-        // Get social media service for this platform
-        const service = socialMediaServiceFactory.getService(connection.platform);
-
-        // Fetch posts from the platform
-        const result = await service.fetchUserPosts(oauthConnection.accessToken, {
-          limit,
-          pageToken,
-        });
-
-        // Store posts in database and add to response
-        for (const post of result.posts) {
-          // Check if post already exists
-          const existingPost = await prisma.post.findUnique({
-            where: {
-              platform_platformPostId: {
-                platform: connection.platform,
-                platformPostId: post.id,
-              },
-            },
-          });
-
-          if (!existingPost) {
-            // Create new post record
-            await prisma.post.create({
-              data: {
-                platform: connection.platform,
-                platformPostId: post.id,
-                title: post.title,
-                url: post.url,
-                publishedAt: post.publishedAt,
-                userId,
-              },
-            });
-          }
-
-          allPosts.push({
-            ...post,
-            platform: connection.platform,
-            hasComments: true, // We'll check this later if needed
-          });
-        }
-
-        platformStatuses.push({
-          platform: connection.platform,
-          status: "connected",
-          postsCount: result.posts.length,
-          pagination: result.pagination,
-        });
-      } catch (platformError: any) {
-        console.error(`Error fetching posts from ${connection.platform}:`, platformError);
-        platformStatuses.push({
-          platform: connection.platform,
-          status: "error",
-          error: platformError.message,
-        });
-      }
-    }
-
-    // Sort posts by published date (newest first)
-    allPosts.sort((a, b) => new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime());
-
-    res.status(200).json({
-      message: "Posts fetched successfully",
-      data: {
-        posts: allPosts.slice(0, limit), // Apply limit to combined results
-        platforms: platformStatuses,
-        totalPosts: allPosts.length,
-      },
-    });
-  } catch (error: any) {
-    console.error("Fetch posts error:", error);
-    res.status(500).json({
-      error: "Failed to fetch posts",
-      message: "An error occurred while fetching posts from connected platforms",
-    });
-  }
-});
+//     // For API source, redirect to use platform-specific endpoints
+//     res.status(400).json({
+//       error: "Invalid request",
+//       message: "To fetch from API, please use platform-specific endpoints: /platforms/{platform}/posts?source=api",
+//     });
+//   } catch (error: any) {
+//     console.error("Fetch posts error:", error);
+//     res.status(500).json({
+//       error: "Failed to fetch posts",
+//       message: "An error occurred while fetching posts",
+//     });
+//   }
+// });
 
 /**
  * POST /analysis/start
@@ -496,5 +603,84 @@ async function fetchCommentsForPost(post: any, userId: string): Promise<void> {
     });
   }
 }
+
+/**
+ * GET /platforms/:platform/user
+ * Get user information from a specific platform
+ */
+router.get("/:platform/user", authenticateToken, async (req: Request, res: Response): Promise<void> => {
+  try {
+    if (!req.user) {
+      res.status(401).json({
+        error: "Unauthorized",
+        message: "User not authenticated",
+      });
+      return;
+    }
+
+    // Validate platform parameter
+    const { error: platformError } = platformParamSchema.validate(req.params);
+    if (platformError) {
+      res.status(400).json({
+        error: "Invalid platform",
+        message: platformError.details[0].message,
+      });
+      return;
+    }
+
+    const userId = req.user.id;
+    const platform = req.params.platform.toUpperCase() as Platform;
+
+    // Check OAuth connection
+    const oauthConnection = await oauthService.getConnection(userId, platform);
+
+    if (!oauthConnection) {
+      res.status(400).json({
+        error: "Platform not connected",
+        message: `Please connect your ${platform} account first`,
+      });
+      return;
+    }
+
+    // Check if token is valid and refresh if needed
+    const isTokenValid = await oauthService.validateToken(userId, platform);
+    if (!isTokenValid) {
+      try {
+        await oauthService.refreshToken(userId, platform);
+        const refreshedConnection = await oauthService.getConnection(userId, platform);
+        if (!refreshedConnection) {
+          throw new Error("Failed to refresh token");
+        }
+        oauthConnection.accessToken = refreshedConnection.accessToken;
+      } catch (refreshError) {
+        res.status(401).json({
+          error: "Token expired",
+          message: "OAuth token expired and refresh failed. Please reconnect your account.",
+        });
+        return;
+      }
+    }
+
+    // Get social media service for this platform
+    const service = socialMediaServiceFactory.getService(platform);
+
+    // Fetch user info from the platform
+    const userInfo = await service.fetchUserInfo(oauthConnection.accessToken);
+
+    res.status(200).json({
+      message: "User info fetched successfully",
+      data: {
+        userInfo,
+        platform,
+      },
+    });
+  } catch (error: any) {
+    console.error(`Error fetching user info from ${req.params.platform}:`, error);
+    res.status(500).json({
+      error: "Failed to fetch user info",
+      message: `An error occurred while fetching user info from ${req.params.platform}`,
+    });
+  }
+});
 
 export default router;

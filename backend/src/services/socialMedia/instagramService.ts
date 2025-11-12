@@ -51,6 +51,30 @@ export class InstagramService implements ISocialMediaService {
   }
 
   /**
+   * Fetch Instagram user information
+   */
+  async fetchUserInfo(accessToken: string): Promise<any> {
+    try {
+      const response = await this.apiClient.get("/me", {
+        params: {
+          fields: "id,username,account_type,media_count",
+          access_token: accessToken,
+        },
+      });
+
+      return {
+        id: response.data.id,
+        username: response.data.username,
+        accountType: response.data.account_type,
+        mediaCount: response.data.media_count,
+      };
+    } catch (error) {
+      logger.error("Error fetching Instagram user info:", error);
+      throw this.transformError(error);
+    }
+  }
+
+  /**
    * Fetch user's Instagram posts
    */
   async fetchUserPosts(

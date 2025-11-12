@@ -1,13 +1,7 @@
-"use client";
-
-import { useState } from "react";
-import { BrandingInfo } from "@/components/auth/BrandingInfo";
-import { AuthForm } from "@/components/auth/AuthForm";
 import { AuthGuard } from "@/components/auth";
+import AuthFormContainer from "@/components/auth/AuthFormContainer";
 
 export default function AuthPage() {
-  const [isLogin, setIsLogin] = useState(true);
-
   return (
     <AuthGuard requireAuth={false}>
       <div className="min-h-screen bg-gradient-dark flex items-center justify-center p-4">
@@ -18,13 +12,7 @@ export default function AuthPage() {
           <div className="absolute top-40 left-40 w-80 h-80 bg-pink-500 rounded-full mix-blend-multiply filter blur-xl opacity-20 animate-blob animation-delay-4000"></div>
         </div>
 
-        <div className="relative w-full max-w-6xl mx-auto grid lg:grid-cols-2 gap-8 items-center">
-          {/* Left Side - Branding & Info */}
-          <BrandingInfo isLogin={isLogin} />
-
-          {/* Right Side - Auth Form */}
-          <AuthForm isLogin={isLogin} setIsLogin={setIsLogin} />
-        </div>
+        <AuthFormContainer />
       </div>
     </AuthGuard>
   );

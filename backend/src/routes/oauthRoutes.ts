@@ -3,10 +3,13 @@ import { passport } from "../config/oauth";
 import { oauthService } from "../services/oauthService";
 import { authenticateToken } from "../middleware/authMiddleware";
 import { Platform } from "@prisma/client";
+import { encrypt } from "../utils/encryption";
+import { socialMediaServiceFactory } from "../services/socialMedia/socialMediaServiceFactory";
 
 const router = Router();
 
 /**
+ * GET /oauth/connect/:platform
  * Initiate OAuth flow for a platform
  */
 router.get("/connect/:platform", authenticateToken, (req: Request, res: Response, next: NextFunction) => {
@@ -23,11 +26,59 @@ router.get("/connect/:platform", authenticateToken, (req: Request, res: Response
     return res.status(400).json({ error: "Invalid platform" });
   }
 
-  // Initiate OAuth flow
-  return passport.authenticate(platform, {
-    session: false,
-    state: userId, // Pass user ID as state parameter
-  })(req, res, next);
+  // Special handling for TikTok following their official recommendation
+  if (platform === "tiktok") {
+    // Generate CSRF state that includes userId for security and persistence
+    const csrfState = `${userId}.${Math.random().toString(36).substring(2)}`;
+
+    const clientKey = process.env.TIKTOK_CLIENT_ID;
+    const redirectUri = process.env.TIKTOK_REDIRECT_URI || `${process.env.BACKEND_URL || "http://localhost:3001"}/api/oauth/tiktok/callback`;
+    const scope = "user.info.profile,user.info.stats,video.list"; // Use your sandbox scopes
+
+    // Build TikTok authorization URL following their official format
+    let authUrl = "https://www.tiktok.com/v2/auth/authorize/";
+    authUrl += `?client_key=${encodeURIComponent(clientKey!)}`;
+    authUrl += `&scope=${encodeURIComponent(scope)}`;
+    authUrl += "&response_type=code";
+    authUrl += `&redirect_uri=${encodeURIComponent(redirectUri)}`;
+    authUrl += `&state=${csrfState}`;
+
+    console.log("Generated TikTok Auth URL:", authUrl);
+
+    return res.status(200).json({
+      authUrl,
+      message: "TikTok authorization URL generated successfully",
+    });
+  }
+
+  // For other platforms, generate auth URLs and return as JSON
+  let authUrl = "";
+
+  switch (platform) {
+    case "youtube":
+      const youtubeScope = "https://www.googleapis.com/auth/youtube.readonly https://www.googleapis.com/auth/userinfo.profile";
+      authUrl = `https://accounts.google.com/o/oauth2/v2/auth?` + `client_id=${encodeURIComponent(process.env.YOUTUBE_CLIENT_ID!)}&` + `redirect_uri=${encodeURIComponent(`${process.env.BACKEND_URL}/api/oauth/youtube/callback`)}&` + `scope=${encodeURIComponent(youtubeScope)}&` + `response_type=code&` + `state=${encodeURIComponent(userId)}`;
+      break;
+
+    case "instagram":
+      authUrl = `https://api.instagram.com/oauth/authorize?` + `client_id=${encodeURIComponent(process.env.INSTAGRAM_CLIENT_ID!)}&` + `redirect_uri=${encodeURIComponent(`${process.env.BACKEND_URL}/api/oauth/instagram/callback`)}&` + `scope=user_profile,user_media&` + `response_type=code&` + `state=${encodeURIComponent(userId)}`;
+      break;
+
+    case "twitter":
+      // Twitter OAuth 1.0a requires request token first, so we'll use passport for this
+      return passport.authenticate(platform, {
+        session: false,
+        state: userId,
+      })(req, res, next);
+
+    default:
+      return res.status(400).json({ error: "Unsupported platform" });
+  }
+
+  return res.json({
+    authUrl,
+    message: `${platform.charAt(0).toUpperCase() + platform.slice(1)} authorization URL generated successfully`,
+  });
 });
 
 /**
@@ -73,6 +124,73 @@ router.get("/instagram/callback", passport.authenticate("instagram", { session: 
 });
 
 /**
+ * POST /oauth/facebook/token
+ * Handle Facebook SDK token and complete OAuth flow
+ */
+router.post("/facebook/token", authenticateToken, async (req: Request, res: Response) => {
+  try {
+    const { accessToken, userID } = req.body;
+    const userId = (req as any).user.id;
+
+    if (!accessToken || !userID) {
+      return res.status(400).json({
+        error: "Missing required parameters",
+        message: "accessToken and userID are required",
+      });
+    }
+
+    // Verify the Facebook token and get user info
+    try {
+      const userResponse = await fetch(`https://graph.facebook.com/me?fields=id,name,email&access_token=${accessToken}`);
+      const userData = await userResponse.json();
+
+      if (!userData.id || userData.id !== userID) {
+        return res.status(400).json({
+          error: "Invalid token",
+          message: "Facebook token validation failed",
+        });
+      }
+
+      // Store the Facebook connection
+      const oauthData = {
+        platform: Platform.FACEBOOK,
+        platformUserId: userData.id,
+        accessToken: accessToken,
+        refreshToken: null, // Facebook SDK tokens don't have refresh tokens
+        profile: userData,
+        tokenExpiresAt: new Date(Date.now() + 2 * 3600 * 1000), // 2 hours from now
+      };
+
+      await oauthService.storeConnection(userId, oauthData);
+
+      return res.json({
+        success: true,
+        message: "Facebook account connected successfully",
+        user: {
+          id: userData.id,
+          name: userData.name,
+          email: userData.email,
+        },
+      });
+    } catch (fbError) {
+      console.error("Facebook API error:", fbError);
+      return res.status(400).json({
+        error: "Facebook API error",
+        message: "Failed to verify Facebook token",
+      });
+    }
+  } catch (error) {
+    console.error("Error handling Facebook token:", error);
+    return res.status(500).json({
+      error: "Internal server error",
+      message: "Failed to process Facebook connection",
+    });
+  }
+});
+
+export { router as oauthRoutes };
+
+/**
  * Twitter OAuth callback
  */
 router.get("/twitter/callback", passport.authenticate("twitter", { session: false }), async (req: Request, res: Response) => {
@@ -94,16 +212,78 @@ router.get("/twitter/callback", passport.authenticate("twitter", { session: fals
 });
 
 /**
- * TikTok OAuth callback
+ * TikTok OAuth callback - Following TikTok's official recommendation
  */
-router.get("/tiktok/callback", passport.authenticate("tiktok", { session: false }), async (req: Request, res: Response) => {
+router.get("/tiktok/callback", async (req: Request, res: Response) => {
   try {
-    const oauthData = req.user as any;
-    const userId = (req.query.state as string) || (req.session as any)?.userId;
+    const { code, state, error } = req.query;
 
-    if (!userId) {
-      return res.redirect(`${process.env.FRONTEND_URL}/auth/error?message=Missing user session`);
+    if (error) {
+      console.error("TikTok OAuth error:", error);
+      return res.redirect(`${process.env.FRONTEND_URL}/auth/error?message=TikTok authorization failed`);
     }
+
+    if (!code || !state) {
+      return res.redirect(`${process.env.FRONTEND_URL}/auth/error?message=Missing authorization code or state`);
+    }
+
+    // Extract userId from state parameter (format: "userId.randomString")
+    const stateParts = (state as string).split(".");
+    if (stateParts.length !== 2) {
+      return res.redirect(`${process.env.FRONTEND_URL}/auth/error?message=Invalid state format`);
+    }
+
+    const userId = stateParts[0];
+    const randomPart = stateParts[1];
+
+    // Basic validation - ensure userId exists and random part has minimum length
+    if (!userId || randomPart.length < 8) {
+      return res.redirect(`${process.env.FRONTEND_URL}/auth/error?message=Invalid state parameter`);
+    }
+
+    // Exchange code for access token (simplified without PKCE)
+    const tokenResponse = await fetch("https://open.tiktokapis.com/v2/oauth/token/", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+      },
+      body: new URLSearchParams({
+        client_key: process.env.TIKTOK_CLIENT_ID!,
+        client_secret: process.env.TIKTOK_CLIENT_SECRET!,
+        code: code as string,
+        grant_type: "authorization_code",
+        redirect_uri: process.env.TIKTOK_REDIRECT_URI!,
+      }),
+    });
+
+    const tokenData = (await tokenResponse.json()) as any;
+
+    if (tokenData?.error) {
+      console.error("TikTok token exchange error:", tokenData);
+      return res.redirect(`${process.env.FRONTEND_URL}/auth/error?message=Failed to exchange authorization code`);
+    }
+
+    const { access_token, refresh_token, expires_in, open_id } = tokenData;
+
+    // Get user info with your sandbox scope fields
+    let userInfo = { open_id };
+    try {
+      const service = socialMediaServiceFactory.getService(Platform.TIKTOK);
+      const userData = await service.fetchUserInfo(access_token);
+      userInfo = userData;
+    } catch (userError) {
+      console.warn("Failed to fetch TikTok user info:", userError);
+    }
+
+    // Store connection
+    const oauthData = {
+      platform: Platform.TIKTOK,
+      platformUserId: userInfo.open_id || open_id,
+      accessToken: encrypt(access_token),
+      refreshToken: encrypt(refresh_token),
+      profile: userInfo,
+      tokenExpiresAt: new Date(Date.now() + expires_in * 1000),
+    };
 
     await oauthService.storeConnection(userId, oauthData);
 
@@ -209,5 +389,3 @@ router.delete("/disconnect/:platform", authenticateToken, async (req: Request, r
     return res.status(500).json({ error: "Failed to disconnect platform" });
   }
 });
-
-export { router as oauthRoutes };

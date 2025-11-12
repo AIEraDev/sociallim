@@ -52,6 +52,30 @@ export class TikTokService implements ISocialMediaService {
   }
 
   /**
+   * Fetch TikTok user information
+   */
+  async fetchUserInfo(accessToken: string): Promise<any> {
+    try {
+      const response = await this.apiClient.post(
+        "/user/info/",
+        {
+          fields: "open_id,union_id,avatar_url,display_name,bio_description,is_verified,profile_deep_link,follower_count,following_count,likes_count,video_count",
+        },
+        {
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+          },
+        }
+      );
+
+      return response.data.data?.user || {};
+    } catch (error) {
+      logger.error("Error fetching TikTok user info:", error);
+      throw this.transformError(error);
+    }
+  }
+
+  /**
    * Fetch user's TikTok videos
    */
   async fetchUserPosts(
@@ -64,28 +88,42 @@ export class TikTokService implements ISocialMediaService {
     try {
       const { limit = 20, pageToken } = options;
 
-      const params: any = {
-        fields: "id,title,video_description,create_time,cover_image_url,share_url,view_count,like_count,comment_count",
+      const queryParams: any = {
+        fields: "cover_image_url,id,title,create_time,video_description,duration,like_count,comment_count,view_count,share_count",
         max_count: Math.min(limit, 20), // TikTok limits to 20 per request
       };
 
       if (pageToken) {
-        params.cursor = pageToken;
+        queryParams.cursor = pageToken;
       }
 
-      const response = await this.apiClient.post("/video/list/", params, {
+      // TikTok Video List API: fields in query params, cursor and max_count in body
+      const requestBody: any = {
+        max_count: queryParams.max_count,
+      };
+
+      if (queryParams.cursor) {
+        requestBody.cursor = queryParams.cursor;
+      }
+
+      const response = await this.apiClient.post("/video/list/", requestBody, {
+        params: {
+          fields: queryParams.fields,
+        },
         headers: {
           Authorization: `Bearer ${accessToken}`,
+          "Content-Type": "application/json",
         },
       });
 
+      // response.data: { data: { cursor: 1749941132860, has_more: true, videos: [] } }
       const videos: TikTokVideo[] = response.data.data?.videos || [];
 
       // Transform to our standard format
       const posts: SocialMediaPost[] = videos.map((video: TikTokVideo) => ({
         id: video.id,
         title: video.title || video.video_description || "TikTok Video",
-        url: video.share_url,
+        url: video.share_url || `https://www.tiktok.com/@user/video/${video.id}`, // Fallback URL if share_url is missing
         publishedAt: new Date(video.create_time * 1000), // TikTok uses Unix timestamp
         platform: Platform.TIKTOK,
         thumbnailUrl: video.cover_image_url,
@@ -122,19 +160,33 @@ export class TikTokService implements ISocialMediaService {
     try {
       const { limit = 20, pageToken } = options;
 
-      const params: any = {
+      const queryParams: any = {
         video_id: postId,
         fields: "id,text,create_time,like_count,user",
         max_count: Math.min(limit, 20), // TikTok limits to 20 per request
       };
 
       if (pageToken) {
-        params.cursor = pageToken;
+        queryParams.cursor = pageToken;
       }
 
-      const response = await this.apiClient.post("/video/comment/list/", params, {
+      // TikTok Comment List API: fields and video_id in query params, cursor and max_count in body
+      const requestBody: any = {
+        max_count: queryParams.max_count,
+      };
+
+      if (queryParams.cursor) {
+        requestBody.cursor = queryParams.cursor;
+      }
+
+      const response = await this.apiClient.post("/video/comment/list/", requestBody, {
+        params: {
+          fields: queryParams.fields,
+          video_id: queryParams.video_id,
+        },
         headers: {
           Authorization: `Bearer ${accessToken}`,
+          "Content-Type": "application/json",
         },
       });
 

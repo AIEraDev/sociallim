@@ -10,7 +10,7 @@ import { useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { getPasswordStrength } from "@/helpers/utils";
 import { loginSchema, registerSchema } from "@/schema/auth-schema";
-import { useAuth } from "@/hooks/use-auth";
+import { useAuthActions } from "@/hooks/use-auth-actions";
 import { toast } from "sonner";
 import RegisterComponent from "./RegisterComponent";
 import LoginComponent from "./LoginComponent";
@@ -39,7 +39,7 @@ export function AuthForm({ isLogin, setIsLogin }: AuthFormProps) {
   const param = searchParams.get("screen") ?? "sign-in";
   const [completedRegister, setCompletedRegister] = useState(false);
 
-  const { isLoggingIn, login: loginUser, register: registerUser, isRegistering } = useAuth();
+  const { isLoggingIn, login: loginUser, register: registerUser, isRegistering } = useAuthActions();
 
   //
   useEffect(() => {

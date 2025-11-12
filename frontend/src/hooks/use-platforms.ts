@@ -6,12 +6,13 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiClient } from "@/lib/api-client";
 import { queryKeys, handleQueryError } from "@/lib/query-client";
-import { Platform } from "@/types";
+import { Platform, Post } from "@/types";
+import { toast } from "sonner";
 
 /**
  * Hook for managing platform connections
  */
-export function usePlatforms() {
+export function usePlatforms(enabled = false) {
   const queryClient = useQueryClient();
 
   // Get connected platforms
@@ -29,26 +30,30 @@ export function usePlatforms() {
       }
       return response.data!;
     },
+    enabled,
   });
 
   // Connect platform mutation
   const connectPlatformMutation = useMutation({
     mutationFn: async (platform: Platform) => {
       const response = await apiClient.connectPlatform(platform);
-      if (!response.success) {
-        throw new Error(response.error?.message || "Failed to connect platform");
+      const data = await response.json();
+      if (!response.ok) {
+        console.log("OAUTH ERROR: ", data);
+        throw new Error(data);
       }
-      return response.data!;
+      return data;
     },
-    onSuccess: (data, platform) => {
-      console.log(platform);
-      // Redirect to OAuth URL
+    onSuccess: (data) => {
+      console.log(data);
+      // // Redirect to OAuth URL
       if (typeof window !== "undefined") {
         window.location.href = data.authUrl;
       }
     },
     onError: (error) => {
       console.error("Platform connection error:", error);
+      toast.error("Failed to connect platform. Please try again.");
     },
   });
 
@@ -112,30 +117,28 @@ export function usePlatforms() {
   };
 }
 
+export interface PostsInterface {
+  source: "live" | "db";
+  platform: Platform;
+  totalPosts: number;
+  posts: Post[];
+}
+
 /**
  * Hook for fetching user posts from connected platforms
  */
-export function usePosts(platform?: Platform) {
-  const {
-    data: posts = [],
-    isLoading,
-    error,
-    refetch,
-  } = useQuery({
+export function usePlatformPosts(platform?: Platform) {
+  const { data, isLoading, error, refetch } = useQuery({
     queryKey: queryKeys.platforms.posts(platform),
     queryFn: async () => {
-      const response = await apiClient.getUserPosts(platform);
-      if (!response.success) {
-        throw new Error(response.error?.message || "Failed to fetch posts");
-      }
-      return response.data!;
+      return await apiClient.getUserPlatformPosts(platform);
     },
     // Only fetch if we have connected platforms
-    enabled: true,
+    enabled: !!platform,
   });
 
   return {
-    posts,
+    postsData: data,
     isLoading,
     error: error ? handleQueryError(error) : null,
     refetch,

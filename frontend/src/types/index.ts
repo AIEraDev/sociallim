@@ -9,6 +9,7 @@ export enum Platform {
   INSTAGRAM = "INSTAGRAM",
   TWITTER = "TWITTER",
   TIKTOK = "TIKTOK",
+  FACEBOOK = "FACEBOOK",
 }
 
 export enum Sentiment {
@@ -21,6 +22,8 @@ export enum Sentiment {
 export interface User {
   id: string;
   email: string;
+  firstName: string;
+  lastName: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -30,18 +33,21 @@ export interface ConnectedPlatform {
   platform: Platform;
   platformUserId: string;
   connectedAt: string;
-  userId: string;
+  tokenExpiresAt: Date | null;
 }
 
 export interface Post {
   id: string;
   platform: Platform;
-  platformPostId: string;
   title: string;
   url: string;
   publishedAt: string;
-  createdAt: string;
-  userId: string;
+  thumbnailUrl?: string;
+  description?: string;
+  viewCount?: number;
+  likeCount?: number;
+  hasComments?: boolean;
+  commentsCount?: number;
 }
 
 export interface Comment {

@@ -1,3 +1,9 @@
+/**
+ * 1- YOUTUBE OAUTH
+ * 2- TWITTER OAUTH
+ * 3- FACEBOOK OAUTH
+ * 4- INSTAGRAM OAUTH
+ */
 import express from "express";
 import morgan from "morgan";
 import dotenv from "dotenv";

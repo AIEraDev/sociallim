@@ -5,6 +5,7 @@
 
 import { User, CookieAuthResponse, LoginRequest, RegisterRequest, Post, AnalysisResult, AnalysisJob, ConnectedPlatform, Platform, ApiResponse, ExportRequest, ComparisonRequest, ComparisonResult } from "@/types";
 import { env } from "@/lib/env";
+import { PostsInterface } from "@/hooks/use-platforms";
 
 // Enhanced error types for better error handling
 export interface ApiError {
@@ -294,6 +295,7 @@ class ApiClient {
     const response = await this.request<CookieAuthResponse>("/auth/login", {
       method: "POST",
       body: JSON.stringify(credentials),
+      credentials: "include",
     });
 
     // With cookie-based auth, the server automatically sets secure cookies
@@ -321,8 +323,8 @@ class ApiClient {
     });
   }
 
-  async getProfile(): Promise<ApiResponse<User>> {
-    return this.request<User>("/auth/profile");
+  async getProfile(): Promise<ApiResponse<{ user: User }>> {
+    return this.request<{ user: User }>("/auth/profile");
   }
 
   async updateProfile(userData: Partial<User>): Promise<ApiResponse<User>> {
@@ -353,8 +355,10 @@ class ApiClient {
     return this.request<ConnectedPlatform[]>("/platforms");
   }
 
-  async connectPlatform(platform: Platform): Promise<ApiResponse<{ authUrl: string }>> {
-    return this.request<{ authUrl: string }>(`/platforms/connect/${platform.toLowerCase()}`);
+  async connectPlatform(platform: Platform) {
+    return await fetch(`${this.baseURL}/oauth/connect/${platform.toLowerCase()}`, {
+      credentials: "include",
+    });
   }
 
   async disconnectPlatform(platform: Platform): Promise<ApiResponse<void>> {
@@ -364,9 +368,16 @@ class ApiClient {
   }
 
   // Posts endpoints
-  async getUserPosts(platform?: Platform): Promise<ApiResponse<Post[]>> {
-    const query = platform ? `?platform=${platform}` : "";
-    return this.request<Post[]>(`/platforms/posts${query}`);
+  async getUserPlatformPosts(platform?: Platform, source: string = "live", limit: number = 5): Promise<PostsInterface> {
+    const query: string = `?source=${source}&limit=${limit}`;
+    const response = await fetch(`${this.baseURL}/platforms/${platform}/posts${query}`, { credentials: "include" });
+
+    const data = await response.json();
+    if (!response.ok) {
+      throw new Error(data);
+    }
+
+    return data.data;
   }
 
   async getPost(postId: string): Promise<ApiResponse<Post>> {

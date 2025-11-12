@@ -75,25 +75,63 @@ export function LoadingCard({ className }: LoadingCardProps) {
 }
 
 /**
- * Post card skeleton specifically for post loading
+ * Post card skeleton specifically for post loading - matches PostItem layout
  */
 export function PostCardSkeleton({ className }: LoadingCardProps) {
   return (
-    <div className={cn("p-4 border rounded-lg space-y-3", className)}>
-      <div className="flex items-start justify-between">
-        <div className="flex items-center gap-2">
-          <div className="w-6 h-6 bg-muted animate-pulse rounded" />
-          <div className="h-3 bg-muted animate-pulse rounded w-16" />
+    <div className={cn("p-4 rounded-xl border border-white/10 bg-white/5 space-y-4", className)}>
+      {/* Main content area */}
+      <div className="flex gap-4">
+        {/* Thumbnail skeleton */}
+        <div className="relative shrink-0">
+          <div className="w-16 h-16 bg-white/10 animate-pulse rounded-lg" />
         </div>
-        <div className="w-5 h-5 bg-muted animate-pulse rounded-full" />
+
+        {/* Content skeleton */}
+        <div className="flex-1 min-w-0 space-y-3">
+          {/* Title skeleton - 2 lines */}
+          <div className="space-y-2">
+            <div className="h-4 bg-white/10 animate-pulse rounded w-full" />
+            <div className="h-4 bg-white/10 animate-pulse rounded w-3/4" />
+          </div>
+
+          {/* Description skeleton - 2 lines */}
+          <div className="space-y-1.5">
+            <div className="h-3 bg-white/8 animate-pulse rounded w-full" />
+            <div className="h-3 bg-white/8 animate-pulse rounded w-2/3" />
+          </div>
+
+          {/* Stats row skeleton */}
+          <div className="flex items-center gap-4">
+            {/* View count */}
+            <div className="flex items-center gap-1">
+              <div className="w-3 h-3 bg-white/8 animate-pulse rounded" />
+              <div className="h-3 bg-white/8 animate-pulse rounded w-8" />
+            </div>
+            {/* Like count */}
+            <div className="flex items-center gap-1">
+              <div className="w-3 h-3 bg-white/8 animate-pulse rounded" />
+              <div className="h-3 bg-white/8 animate-pulse rounded w-6" />
+            </div>
+            {/* Comments */}
+            <div className="flex items-center gap-1">
+              <div className="w-3 h-3 bg-white/8 animate-pulse rounded" />
+              <div className="h-3 bg-white/8 animate-pulse rounded w-12" />
+            </div>
+            {/* Time - right aligned */}
+            <div className="flex items-center gap-1 ml-auto">
+              <div className="w-3 h-3 bg-white/8 animate-pulse rounded" />
+              <div className="h-3 bg-white/8 animate-pulse rounded w-10" />
+            </div>
+          </div>
+        </div>
       </div>
-      <div className="h-5 bg-muted animate-pulse rounded w-4/5" />
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <div className="h-3 bg-muted animate-pulse rounded w-20" />
-          <div className="h-3 bg-muted animate-pulse rounded w-16" />
-        </div>
-        <div className="h-8 bg-muted animate-pulse rounded w-20" />
+
+      {/* Action buttons skeleton */}
+      <div className="flex gap-2 pt-3 border-t border-white/5">
+        <div className="h-8 bg-white/8 animate-pulse rounded px-3 w-20" />
+        <div className="h-8 bg-white/8 animate-pulse rounded px-3 w-24" />
+        <div className="h-8 bg-white/8 animate-pulse rounded px-3 w-20 ml-auto" />
       </div>
     </div>
   );
@@ -115,4 +153,8 @@ export function LoadingPage({ message = "Loading..." }: LoadingPageProps) {
       </div>
     </div>
   );
+}
+
+export function LoadingSingleCard({ className }: { className?: string }) {
+  return <div className={cn("w-full h-full bg-white/8 animate-pulse rounded-lg " + className)} />;
 }

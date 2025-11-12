@@ -223,6 +223,7 @@ enum Platform {
   INSTAGRAM
   TWITTER
   TIKTOK
+  FACEBOOK
 }
 
 enum Sentiment {

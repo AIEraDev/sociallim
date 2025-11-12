@@ -1,5 +1,4 @@
 import { Request, Response, NextFunction } from "express";
-import { User } from "@prisma/client";
 import { AuthService } from "../services/authService";
 import { CookieUtils } from "../utils/cookieUtils";
 

@@ -59,6 +59,39 @@ export class TwitterService implements ISocialMediaService {
   }
 
   /**
+   * Fetch Twitter user information
+   */
+  async fetchUserInfo(accessToken: string): Promise<any> {
+    try {
+      const response = await this.apiClient.get("/users/me", {
+        params: {
+          "user.fields": "id,name,username,description,public_metrics,profile_image_url,verified",
+        },
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+        },
+      });
+
+      const user = response.data.data;
+      return {
+        id: user.id,
+        name: user.name,
+        username: user.username,
+        description: user.description,
+        profileImageUrl: user.profile_image_url,
+        verified: user.verified,
+        followersCount: user.public_metrics?.followers_count,
+        followingCount: user.public_metrics?.following_count,
+        tweetCount: user.public_metrics?.tweet_count,
+        listedCount: user.public_metrics?.listed_count,
+      };
+    } catch (error) {
+      logger.error("Error fetching Twitter user info:", error);
+      throw this.transformError(error);
+    }
+  }
+
+  /**
    * Fetch user's Twitter posts (tweets)
    */
   async fetchUserPosts(

@@ -129,8 +129,8 @@ export const authenticateAnyToken = async (req: Request, res: Response, next: Ne
       });
       return;
     }
-    const decoded = jwt.verify(token, config.jwt.secret) as any;
 
+    const decoded = jwt.verify(token, config.jwt.secret) as any;
     if (decoded.type === "limited_access") {
       // Handle limited access token
       await authenticateLimitedToken(req, res, next);
