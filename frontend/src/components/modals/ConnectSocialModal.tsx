@@ -196,7 +196,7 @@ interface PlatformConnectItem {
 
 function PlatformConnectItem({ platform, isConnected, isConnecting, refetchPlatforms }: PlatformConnectItem) {
   const { disconnectPlatform, connectPlatform, isLoading: loadingConnectedPlatforms } = usePlatforms();
-  const { connectFacebook, connectTwitter, disconnectAccount, isConnected: isAuthConnected, canConnectSocial, isBackendAuthenticated, socialSession } = useSocialAuth();
+  const { connectFacebook, connectTwitter, disconnectAccount, isBackendAuthenticated, socialSession } = useSocialAuth();
 
   // Handle social media connections using NextAuth
   const handleConnect = async (platformId: string) => {
@@ -217,11 +217,12 @@ function PlatformConnectItem({ platform, isConnected, isConnecting, refetchPlatf
         const status = await connectTwitter();
         console.log("Twitter connection status:", status);
 
-        // For Twitter, the connection happens in a new tab
-        // We'll listen for the success message and then sync with backend
+        // If auth is successful, sync with backend
         if (status) {
-          // Set up listener for Twitter auth completion
-          setupTwitterAuthListener();
+          // Wait a moment for the session to update, then sync
+          setTimeout(async () => {
+            await syncTwitterWithBackend();
+          }, 2000);
         }
         break;
       default:
@@ -229,38 +230,6 @@ function PlatformConnectItem({ platform, isConnected, isConnecting, refetchPlatf
         connectPlatform(platformId as Platform);
         break;
     }
-  };
-
-  /**
-   * Set up listener for Twitter authentication completion
-   */
-  const setupTwitterAuthListener = () => {
-    const messageListener = (event: MessageEvent) => {
-      if (event.origin !== window.location.origin) return;
-
-      if (event.data.type === "TWITTER_AUTH_SUCCESS") {
-        window.removeEventListener("message", messageListener);
-        toast.success("Twitter authentication completed!");
-
-        // Wait a moment for the session to update, then sync with backend
-        setTimeout(async () => {
-          await syncTwitterWithBackend();
-        }, 2000);
-      } else if (event.data.type === "TWITTER_AUTH_ERROR") {
-        window.removeEventListener("message", messageListener);
-        toast.error("Twitter authentication failed");
-      } else if (event.data.type === "TWITTER_AUTH_CANCELLED") {
-        window.removeEventListener("message", messageListener);
-        toast.info("Twitter authentication was cancelled");
-      }
-    };
-
-    window.addEventListener("message", messageListener);
-
-    // Clean up listener after 10 minutes
-    setTimeout(() => {
-      window.removeEventListener("message", messageListener);
-    }, 600000);
   };
 
   /**
