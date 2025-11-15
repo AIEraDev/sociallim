@@ -128,7 +128,7 @@ The application uses a sophisticated color system with CSS custom properties for
 2. **Environment Setup** Create a `.env.local` file:
 
    ```env
-   NEXT_PUBLIC_API_URL=http://localhost:3001/api
+   NEXT_PUBLIC_API_URL=http://localhost:5628/api
    ```
 
 3. **Development Server**

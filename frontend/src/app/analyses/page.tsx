@@ -4,9 +4,9 @@ import { Search, Filter, Download, RefreshCw, Plus, Calendar } from "lucide-reac
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Sidebar } from "@/components/dashboard/Sidebar";
-import { Topbar } from "@/components/dashboard/topbar";
 import { PostCard } from "@/components/dashboard/post-card";
+import AppLayout from "@/components/AppLayout";
+import GlobalHeader from "@/components/GlobalHeader";
 
 const mockAnalyses = [
   {
@@ -60,10 +60,11 @@ export default function AnalysesPage() {
   const handleViewDetails = (id: number) => {};
 
   return (
-    <div className="min-h-screen bg-gradient-dark">
-      <Sidebar />
+    <AppLayout>
       <div className="transition-all duration-300">
-        <Topbar />
+        {/* Global Header / Controls */}
+        <GlobalHeader />
+
         <main className="w-full lg:max-w-[calc(100vw-240px)] mx-auto px-4 sm:px-6 py-6 sm:py-8">
           {/* Header */}
           <div className="mb-8">
@@ -145,6 +146,6 @@ export default function AnalysesPage() {
           </Card>
         </main>
       </div>
-    </div>
+    </AppLayout>
   );
 }

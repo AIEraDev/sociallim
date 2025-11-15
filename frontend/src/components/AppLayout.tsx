@@ -1,3 +1,5 @@
+"use client";
+
 import React from "react";
 import { Sidebar } from "./dashboard/Sidebar";
 import { ConnectSocialModal } from "./modals/ConnectSocialModal";

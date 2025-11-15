@@ -32,7 +32,7 @@ router.get("/connect/:platform", authenticateToken, (req: Request, res: Response
     const csrfState = `${userId}.${Math.random().toString(36).substring(2)}`;
 
     const clientKey = process.env.TIKTOK_CLIENT_ID;
-    const redirectUri = process.env.TIKTOK_REDIRECT_URI || `${process.env.BACKEND_URL || "http://localhost:3001"}/api/oauth/tiktok/callback`;
+    const redirectUri = process.env.TIKTOK_REDIRECT_URI || `${process.env.BACKEND_URL || "http://localhost:5628"}/api/oauth/tiktok/callback`;
     const scope = "user.info.profile,user.info.stats,video.list"; // Use your sandbox scopes
 
     // Build TikTok authorization URL following their official format
@@ -155,7 +155,7 @@ router.post("/facebook/token", authenticateToken, async (req: Request, res: Resp
       const oauthData = {
         platform: Platform.FACEBOOK,
         platformUserId: userData.id,
-        accessToken: accessToken,
+        accessToken: encrypt(accessToken),
         refreshToken: null, // Facebook SDK tokens don't have refresh tokens
         profile: userData,
         tokenExpiresAt: new Date(Date.now() + 2 * 3600 * 1000), // 2 hours from now
@@ -184,6 +184,89 @@ router.post("/facebook/token", authenticateToken, async (req: Request, res: Resp
     return res.status(500).json({
       error: "Internal server error",
       message: "Failed to process Facebook connection",
+    });
+  }
+});
+
+/**
+ * POST /oauth/twitter/token
+ * Handle NextAuth Twitter token and complete OAuth flow
+ */
+router.post("/twitter/token", authenticateToken, async (req: Request, res: Response) => {
+  try {
+    const { accessToken, refreshToken, providerAccountId, userProfile } = req.body;
+    const userId = (req as any).user.id;
+
+    if (!accessToken || !providerAccountId) {
+      return res.status(400).json({
+        error: "Missing required parameters",
+        message: "accessToken and providerAccountId are required",
+      });
+    }
+
+    // Verify the Twitter token by making a test API call
+    try {
+      const userResponse = await fetch("https://api.twitter.com/2/users/me", {
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+        },
+      });
+
+      if (!userResponse.ok) {
+        return res.status(400).json({
+          error: "Invalid token",
+          message: "Twitter token validation failed",
+        });
+      }
+
+      const userData = await userResponse.json();
+      const twitterUser = userData.data;
+
+      if (!twitterUser || twitterUser.id !== providerAccountId) {
+        return res.status(400).json({
+          error: "Token mismatch",
+          message: "Twitter token does not match the provided user ID",
+        });
+      }
+
+      // Store the Twitter connection
+      const oauthData = {
+        platform: Platform.TWITTER,
+        platformUserId: twitterUser.id,
+        accessToken: encrypt(accessToken),
+        refreshToken: refreshToken ? encrypt(refreshToken) : null,
+        profile: {
+          id: twitterUser.id,
+          username: twitterUser.username,
+          name: twitterUser.name,
+          ...userProfile,
+        },
+        tokenExpiresAt: refreshToken ? new Date(Date.now() + 7200 * 1000) : null, // 2 hours if we have refresh token
+      };
+
+      await oauthService.storeConnection(userId, oauthData);
+
+      return res.json({
+        success: true,
+        message: "Twitter account connected successfully",
+        user: {
+          id: twitterUser.id,
+          username: twitterUser.username,
+          name: twitterUser.name,
+        },
+      });
+    } catch (twitterError) {
+      console.error("Twitter API error:", twitterError);
+      return res.status(400).json({
+        error: "Twitter API error",
+        message: "Failed to verify Twitter token",
+      });
+    }
+  } catch (error) {
+    console.error("Error handling Twitter token:", error);
+    return res.status(500).json({
+      error: "Internal server error",
+      message: "Failed to process Twitter connection",
     });
   }
 });

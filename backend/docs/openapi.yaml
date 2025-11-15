@@ -40,7 +40,7 @@ servers:
     description: Production server
   - url: https://staging-api.comment-analyzer.com/v1
     description: Staging server
-  - url: http://localhost:3000/v1
+  - url: http://localhost:5628/v1
     description: Development server
 
 paths:

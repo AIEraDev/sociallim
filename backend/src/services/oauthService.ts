@@ -139,8 +139,13 @@ export class OAuthService {
           refreshResult = await this.refreshInstagramToken(connection.refreshToken);
           break;
         case Platform.TWITTER:
-          // Twitter OAuth 1.0a tokens don't expire
-          return null;
+          // Twitter OAuth 2.0 tokens can be refreshed if we have a refresh token
+          if (connection.refreshToken) {
+            refreshResult = await this.refreshTwitterToken(connection.refreshToken);
+          } else {
+            // Twitter OAuth 1.0a tokens don't expire, OAuth 2.0 without refresh token also doesn't expire
+            return null;
+          }
         case Platform.TIKTOK:
           refreshResult = await this.refreshTikTokToken(connection.refreshToken);
           break;
@@ -209,6 +214,34 @@ export class OAuthService {
       accessToken: access_token,
       refreshToken: refreshToken, // Instagram doesn't provide new refresh tokens
       expiresAt: new Date(Date.now() + expires_in * 1000),
+    };
+  }
+
+  /**
+   * Refresh Twitter OAuth 2.0 token
+   */
+  private async refreshTwitterToken(refreshToken: string): Promise<TokenRefreshResult> {
+    const response = await axios.post(
+      "https://api.twitter.com/2/oauth2/token",
+      new URLSearchParams({
+        refresh_token: refreshToken,
+        grant_type: "refresh_token",
+        client_id: process.env.TWITTER_CLIENT_ID!,
+      }),
+      {
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded",
+          Authorization: `Basic ${Buffer.from(`${process.env.TWITTER_CLIENT_ID}:${process.env.TWITTER_CLIENT_SECRET}`).toString("base64")}`,
+        },
+      }
+    );
+
+    const { access_token, refresh_token, expires_in } = response.data;
+
+    return {
+      accessToken: access_token,
+      refreshToken: refresh_token || refreshToken, // Use new refresh token if provided
+      expiresAt: expires_in ? new Date(Date.now() + expires_in * 1000) : undefined,
     };
   }
 

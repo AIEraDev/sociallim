@@ -13,7 +13,7 @@ export const corsOptions = {
     // Allow requests with no origin (like mobile apps or curl requests)
     if (!origin) return callback(null, true);
 
-    const allowedOrigins = [config.frontendUrl, "https://corporatist-zoe-unsheeted.ngrok-free.dev", "http://localhost:3000", "http://localhost:3001", "https://localhost:3000", "https://localhost:3001"];
+    const allowedOrigins = [config.frontendUrl, "https://corporatist-zoe-unsheeted.ngrok-free.dev", "http://localhost:5628", "http://localhost:5628", "https://localhost:5628", "https://localhost:5628"];
 
     // In development, allow all localhost origins
     if (config.env === "development") {

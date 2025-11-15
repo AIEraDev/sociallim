@@ -4,7 +4,7 @@
 
 import { useState } from "react";
 
-import { RefreshCw, Plus, Download, Save, ExternalLink, AlertTriangle, MessageSquare, BarChart3, Tag, Shield } from "lucide-react";
+import { RefreshCw, Save, ExternalLink, AlertTriangle, MessageSquare, BarChart3, Tag, Shield } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -79,21 +79,8 @@ const mockAnalytics = {
 
 export default function DashboardPage() {
   const [selectedPost] = useState<number | null>(1); // Default to first post
-  const { setIsConnectModalOpen } = usePlatformStore();
-
-  // Toggle this to test first-time user experience
-  const [isFirstTimeUser, setIsFirstTimeUser] = useState(true);
 
   const currentPost = selectedPost ? mockSelectedPost : null;
-
-  // Empty state data for first-time users
-  const emptyKPIData = {
-    totalComments: { value: "0", change: "0%", period: "last 24h" },
-    sentimentSnapshot: { positive: 0, neutral: 0, negative: 0 },
-    engagementRate: { value: "0", unit: "comments/hour" },
-    alerts: { count: 0, unread: 0 },
-    lastAnalysis: { timestamp: "Never", model: "v2.1.3" },
-  };
 
   return (
     <AppLayout>
@@ -104,55 +91,48 @@ export default function DashboardPage() {
         {/* KPI Strip */}
         <div className="border-b border-white/10 bg-black/10">
           <div className="w-full lg:max-w-[calc(100vw-240px)] mx-auto px-4 sm:px-6 py-4">
-            {isFirstTimeUser && (
-              <div className="text-center mb-4">
-                <Button size="sm" variant="outline" onClick={() => setIsFirstTimeUser(false)} className="border-blue-500/20 bg-blue-500/10 text-blue-400 hover:bg-blue-500/20">
-                  Toggle Demo Data (Testing)
-                </Button>
-              </div>
-            )}
             <div className="grid grid-cols-2 lg:grid-cols-5 gap-6">
               {/* Total Comments */}
               <div className="text-center">
-                <div className="text-2xl font-bold text-white">{isFirstTimeUser ? emptyKPIData.totalComments.value : mockKPIData.totalComments.value}</div>
+                <div className="text-2xl font-bold text-white"> {mockKPIData.totalComments.value}</div>
                 <div className="text-sm text-gray-400">Total Comments</div>
                 <div className="text-xs text-green-400">
-                  {isFirstTimeUser ? emptyKPIData.totalComments.change : mockKPIData.totalComments.change} {isFirstTimeUser ? emptyKPIData.totalComments.period : mockKPIData.totalComments.period}
+                  {mockKPIData.totalComments.change} {mockKPIData.totalComments.period}
                 </div>
               </div>
 
               {/* Sentiment Snapshot */}
               <div className="text-center">
                 <div className="flex justify-center gap-1 mb-1">
-                  <div className="text-green-400 font-semibold">{isFirstTimeUser ? emptyKPIData.sentimentSnapshot.positive : mockKPIData.sentimentSnapshot.positive}%</div>
+                  <div className="text-green-400 font-semibold">{mockKPIData.sentimentSnapshot.positive}%</div>
                   <div className="text-gray-400">/</div>
-                  <div className="text-yellow-400 font-semibold">{isFirstTimeUser ? emptyKPIData.sentimentSnapshot.neutral : mockKPIData.sentimentSnapshot.neutral}%</div>
+                  <div className="text-yellow-400 font-semibold">{mockKPIData.sentimentSnapshot.neutral}%</div>
                   <div className="text-gray-400">/</div>
-                  <div className="text-red-400 font-semibold">{isFirstTimeUser ? emptyKPIData.sentimentSnapshot.negative : mockKPIData.sentimentSnapshot.negative}%</div>
+                  <div className="text-red-400 font-semibold">{mockKPIData.sentimentSnapshot.negative}%</div>
                 </div>
                 <div className="text-sm text-gray-400">Pos / Neu / Neg</div>
               </div>
 
               {/* Engagement Rate */}
               <div className="text-center">
-                <div className="text-2xl font-bold text-white">{isFirstTimeUser ? emptyKPIData.engagementRate.value : mockKPIData.engagementRate.value}</div>
-                <div className="text-sm text-gray-400">{isFirstTimeUser ? emptyKPIData.engagementRate.unit : mockKPIData.engagementRate.unit}</div>
+                <div className="text-2xl font-bold text-white">{mockKPIData.engagementRate.value}</div>
+                <div className="text-sm text-gray-400">{mockKPIData.engagementRate.unit}</div>
               </div>
 
               {/* Alerts */}
               <div className="text-center">
                 <div className="flex items-center justify-center gap-1">
                   <AlertTriangle className="w-4 h-4 text-orange-400" />
-                  <span className="text-2xl font-bold text-white">{isFirstTimeUser ? emptyKPIData.alerts.count : mockKPIData.alerts.count}</span>
-                  {!isFirstTimeUser && mockKPIData.alerts.unread > 0 && <Badge className="bg-red-500 text-white text-xs ml-1">{mockKPIData.alerts.unread}</Badge>}
+                  <span className="text-2xl font-bold text-white">{mockKPIData.alerts.count}</span>
+                  <Badge className="bg-red-500 text-white text-xs ml-1">{mockKPIData.alerts.unread}</Badge>
                 </div>
                 <div className="text-sm text-gray-400">Alerts</div>
               </div>
 
               {/* Last Analysis */}
               <div className="text-center">
-                <div className="text-sm font-medium text-white">{isFirstTimeUser ? emptyKPIData.lastAnalysis.timestamp : mockKPIData.lastAnalysis.timestamp}</div>
-                <div className="text-xs text-gray-400">Model {isFirstTimeUser ? emptyKPIData.lastAnalysis.model : mockKPIData.lastAnalysis.model}</div>
+                <div className="text-sm font-medium text-white">{mockKPIData.lastAnalysis.timestamp}</div>
+                <div className="text-xs text-gray-400">Model {mockKPIData.lastAnalysis.model}</div>
               </div>
             </div>
           </div>
@@ -166,52 +146,7 @@ export default function DashboardPage() {
 
             {/* Center Column - Post Analysis */}
             <div className="w-120">
-              {isFirstTimeUser ? (
-                /* First-Time User Onboarding */
-                <Card className="glass-card border-white/20">
-                  <CardContent className="flex items-center justify-center py-16">
-                    <div className="text-center max-w-md">
-                      <div className="w-20 h-20 mx-auto mb-6 rounded-full bg-linear-to-br from-blue-500/20 to-purple-500/20 flex items-center justify-center">
-                        <BarChart3 className="w-10 h-10 text-blue-400" />
-                      </div>
-                      <h2 className="text-2xl font-bold text-white mb-4">Welcome to Sociallim!</h2>
-                      <p className="text-gray-300 mb-6">Start analyzing your social media comments with AI-powered sentiment analysis. Connect your accounts or import a post URL to get started.</p>
-                      <div className="space-y-3">
-                        <Button className="w-full bg-gradient-primary hover:opacity-90" onClick={() => setIsConnectModalOpen(true)}>
-                          <Plus className="w-4 h-4 mr-2" />
-                          Connect Your First Account
-                        </Button>
-                        <Button variant="outline" className="w-full border-white/10 bg-white/5 text-white hover:bg-white/10">
-                          <Download className="w-4 h-4 mr-2" />
-                          Try with Sample URL
-                        </Button>
-                        <Button variant="ghost" className="w-full text-blue-400 hover:bg-blue-500/10" onClick={() => setIsFirstTimeUser(false)}>
-                          View Demo Dashboard
-                        </Button>
-                      </div>
-
-                      {/* Quick Start Guide */}
-                      <div className="mt-8 p-4 rounded-lg bg-white/5 border border-white/10 text-left">
-                        <h3 className="text-white font-medium mb-3">Quick Start:</h3>
-                        <div className="space-y-2 text-sm text-gray-300">
-                          <div className="flex items-center gap-2">
-                            <div className="w-5 h-5 rounded-full bg-blue-500/20 flex items-center justify-center text-xs text-blue-400">1</div>
-                            <span>Connect YouTube, Instagram, Twitter, or TikTok</span>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <div className="w-5 h-5 rounded-full bg-blue-500/20 flex items-center justify-center text-xs text-blue-400">2</div>
-                            <span>Select posts to analyze</span>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <div className="w-5 h-5 rounded-full bg-blue-500/20 flex items-center justify-center text-xs text-blue-400">3</div>
-                            <span>Get AI insights and sentiment analysis</span>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              ) : currentPost ? (
+              {currentPost ? (
                 <div className="space-y-6">
                   {/* Post Header */}
                   <Card className="glass-card border-white/20">
@@ -386,134 +321,70 @@ export default function DashboardPage() {
 
             {/* Right Column - Analytics & Controls */}
             <div className="hidden lg:col-span-3 space-y-6">
-              {isFirstTimeUser ? (
-                /* Empty State Analytics */
-                <>
-                  <Card className="glass-card border-white/20">
-                    <CardHeader>
-                      <CardTitle className="text-white text-lg">Comment Volume (24h)</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="h-24 flex items-center justify-center">
-                        <div className="text-center">
-                          <BarChart3 className="w-8 h-8 text-gray-500 mx-auto mb-2" />
-                          <p className="text-xs text-gray-500">No data yet</p>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-
-                  <Card className="glass-card border-white/20">
-                    <CardHeader>
-                      <CardTitle className="text-white text-lg">Top Keywords</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="text-center py-4">
-                        <Tag className="w-8 h-8 text-gray-500 mx-auto mb-2" />
-                        <p className="text-xs text-gray-500">Keywords will appear here</p>
-                      </div>
-                    </CardContent>
-                  </Card>
-
-                  <Card className="glass-card border-white/20">
-                    <CardHeader>
-                      <CardTitle className="text-white text-lg flex items-center gap-2">
-                        <Shield className="w-5 h-5" />
-                        Moderation Queue
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="text-center py-4">
-                        <Shield className="w-8 h-8 text-gray-500 mx-auto mb-2" />
-                        <p className="text-xs text-gray-500">No items to moderate</p>
-                      </div>
-                    </CardContent>
-                  </Card>
-
-                  {/* Getting Started Tips */}
-                  <Card className="glass-card border-white/20">
-                    <CardHeader>
-                      <CardTitle className="text-white text-lg">Getting Started</CardTitle>
-                    </CardHeader>
-                    <CardContent className="space-y-3">
-                      <div className="p-3 rounded-lg bg-blue-500/10 border border-blue-500/20">
-                        <h4 className="text-blue-400 font-medium text-sm mb-1">💡 Pro Tip</h4>
-                        <p className="text-xs text-gray-300">Connect multiple platforms to get comprehensive insights across all your content.</p>
-                      </div>
-                      <div className="p-3 rounded-lg bg-green-500/10 border border-green-500/20">
-                        <h4 className="text-green-400 font-medium text-sm mb-1">🚀 Quick Start</h4>
-                        <p className="text-xs text-gray-300">Import a post URL to see instant sentiment analysis without connecting accounts.</p>
-                      </div>
-                    </CardContent>
-                  </Card>
-                </>
-              ) : (
-                /* Regular Analytics */
-                <>
-                  <Card className="glass-card border-white/20">
-                    <CardHeader>
-                      <CardTitle className="text-white text-lg">Comment Volume (24h)</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="h-24 flex items-end justify-between gap-1">
-                        {mockAnalytics.commentVolume.map((value, index) => (
-                          <div key={index} className="bg-blue-500/30 rounded-t" style={{ height: `${(value / 100) * 100}%`, width: "3px" }} />
-                        ))}
-                      </div>
-                    </CardContent>
-                  </Card>
-
-                  <Card className="glass-card border-white/20">
-                    <CardHeader>
-                      <CardTitle className="text-white text-lg">Top Keywords</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="flex flex-wrap gap-2">
-                        {mockAnalytics.topKeywords.map((keyword, index) => (
-                          <Badge key={index} variant="outline" className="text-xs">
-                            {keyword}
-                          </Badge>
-                        ))}
-                      </div>
-                    </CardContent>
-                  </Card>
-
-                  <Card className="glass-card border-white/20">
-                    <CardHeader>
-                      <CardTitle className="text-white text-lg flex items-center gap-2">
-                        <Shield className="w-5 h-5" />
-                        Moderation Queue
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent className="space-y-3">
-                      {mockAnalytics.moderationQueue.map((item) => (
-                        <div key={item.id} className="p-2 rounded bg-red-500/10 border border-red-500/20">
-                          <div className="flex items-center justify-between mb-1">
-                            <Badge className={`text-xs ${item.severity === "high" ? "bg-red-500/20 text-red-400" : "bg-yellow-500/20 text-yellow-400"}`}>{item.reason}</Badge>
-                            <span className="text-xs text-gray-400">{item.severity}</span>
-                          </div>
-                          <p className="text-xs text-gray-300 truncate">{item.comment}</p>
-                        </div>
+              <>
+                <Card className="glass-card border-white/20">
+                  <CardHeader>
+                    <CardTitle className="text-white text-lg">Comment Volume (24h)</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="h-24 flex items-end justify-between gap-1">
+                      {mockAnalytics.commentVolume.map((value, index) => (
+                        <div key={index} className="bg-blue-500/30 rounded-t" style={{ height: `${(value / 100) * 100}%`, width: "3px" }} />
                       ))}
-                    </CardContent>
-                  </Card>
+                    </div>
+                  </CardContent>
+                </Card>
 
-                  <Card className="glass-card border-white/20">
-                    <CardHeader>
-                      <CardTitle className="text-white text-lg">Privacy & Retention</CardTitle>
-                    </CardHeader>
-                    <CardContent className="space-y-4">
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm text-gray-300">Save Transcripts</span>
-                        <Switch />
+                <Card className="glass-card border-white/20">
+                  <CardHeader>
+                    <CardTitle className="text-white text-lg">Top Keywords</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="flex flex-wrap gap-2">
+                      {mockAnalytics.topKeywords.map((keyword, index) => (
+                        <Badge key={index} variant="outline" className="text-xs">
+                          {keyword}
+                        </Badge>
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card className="glass-card border-white/20">
+                  <CardHeader>
+                    <CardTitle className="text-white text-lg flex items-center gap-2">
+                      <Shield className="w-5 h-5" />
+                      Moderation Queue
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    {mockAnalytics.moderationQueue.map((item) => (
+                      <div key={item.id} className="p-2 rounded bg-red-500/10 border border-red-500/20">
+                        <div className="flex items-center justify-between mb-1">
+                          <Badge className={`text-xs ${item.severity === "high" ? "bg-red-500/20 text-red-400" : "bg-yellow-500/20 text-yellow-400"}`}>{item.reason}</Badge>
+                          <span className="text-xs text-gray-400">{item.severity}</span>
+                        </div>
+                        <p className="text-xs text-gray-300 truncate">{item.comment}</p>
                       </div>
-                      <Button size="sm" variant="outline" className="w-full border-red-500/20 text-red-400 hover:bg-red-500/10">
-                        Delete Cached Comments
-                      </Button>
-                    </CardContent>
-                  </Card>
-                </>
-              )}
+                    ))}
+                  </CardContent>
+                </Card>
+
+                <Card className="glass-card border-white/20">
+                  <CardHeader>
+                    <CardTitle className="text-white text-lg">Privacy & Retention</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-gray-300">Save Transcripts</span>
+                      <Switch />
+                    </div>
+                    <Button size="sm" variant="outline" className="w-full border-red-500/20 text-red-400 hover:bg-red-500/10">
+                      Delete Cached Comments
+                    </Button>
+                  </CardContent>
+                </Card>
+              </>
             </div>
           </div>
         </main>

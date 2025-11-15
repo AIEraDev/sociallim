@@ -69,7 +69,7 @@ A Node.js backend API for analyzing comment sentiment across social media platfo
    npm run dev
    ```
 
-The server will start on `http://localhost:3001`
+The server will start on `http://localhost:5628`
 
 ## Environment Configuration
 
@@ -263,7 +263,7 @@ COPY package*.json ./
 RUN npm ci --only=production
 COPY . .
 RUN npm run build
-EXPOSE 3001
+EXPOSE 5628
 CMD ["npm", "start"]
 ```
 

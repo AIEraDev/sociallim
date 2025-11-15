@@ -84,7 +84,7 @@ The Prisma schema defines the following models:
 ### Core Settings
 
 - `NODE_ENV`: Environment (development/production/test)
-- `PORT`: Server port (default: 3001)
+- `PORT`: Server port (default: 5628)
 - `FRONTEND_URL`: Frontend application URL
 
 ### Database

@@ -9,11 +9,11 @@ import { Platform } from "@prisma/client";
 
 // OAuth callback URLs
 const CALLBACK_URLS = {
-  youtube: `${process.env.BACKEND_URL || "http://localhost:3001"}/auth/youtube/callback`,
-  instagram: `${process.env.BACKEND_URL || "http://localhost:3001"}/auth/instagram/callback`,
-  twitter: `${process.env.BACKEND_URL || "http://localhost:3001"}/auth/twitter/callback`,
-  tiktok: `${process.env.BACKEND_URL || "http://localhost:3001"}/auth/tiktok/callback`,
-  facebook: `${process.env.BACKEND_URL || "http://localhost:3001"}/auth/facebook/callback`,
+  youtube: `${process.env.BACKEND_URL || "http://localhost:5628"}/auth/youtube/callback`,
+  instagram: `${process.env.BACKEND_URL || "http://localhost:5628"}/auth/instagram/callback`,
+  twitter: `${process.env.BACKEND_URL || "http://localhost:5628"}/auth/twitter/callback`,
+  tiktok: `${process.env.BACKEND_URL || "http://localhost:5628"}/auth/tiktok/callback`,
+  facebook: `${process.env.BACKEND_URL || "http://localhost:5628"}/auth/facebook/callback`,
 };
 
 /**

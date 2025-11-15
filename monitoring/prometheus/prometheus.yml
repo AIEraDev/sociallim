@@ -85,8 +85,8 @@ scrape_configs:
   - job_name: "health-checks"
     static_configs:
       - targets:
-          - "api:3000"
-          - "frontend:3000"
+          - "api:5628"
+          - "frontend:5628"
     scrape_interval: 60s
     metrics_path: /health
     scheme: http

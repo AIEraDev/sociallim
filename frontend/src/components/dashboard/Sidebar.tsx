@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, MessageSquare, BarChart3, Settings, Users, ChevronLeft, ChevronRight } from "lucide-react";
+import { LayoutDashboard, MessageSquare, Settings, ChevronLeft, ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 import FooterSidebar from "../Sidebar/FooterSidebar";
 import NavItemSidebar, { NavItemType } from "../Sidebar/NavItemSidebar";
@@ -11,8 +11,6 @@ import NavItemSidebar, { NavItemType } from "../Sidebar/NavItemSidebar";
 const navItems: NavItemType[] = [
   { icon: LayoutDashboard, label: "Dashboard", href: "/dashboard", active: true },
   { icon: MessageSquare, label: "Analyses", href: "/analyses" },
-  { icon: BarChart3, label: "Analytics", href: "/analytics" },
-  { icon: Users, label: "Platforms", href: "/platforms" },
   { icon: Settings, label: "Settings", href: "/settings" },
 ];
 

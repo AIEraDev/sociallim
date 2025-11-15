@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { X, Youtube, Instagram, CheckCircle, ExternalLink, Loader2, AlertCircle, Facebook } from "lucide-react";
+import { X, CheckCircle, ExternalLink, Loader2, AlertCircle, Facebook, Instagram } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -10,6 +10,7 @@ import { Separator } from "@/components/ui/separator";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { TikTokIcon } from "../Icons";
 import { usePlatforms } from "@/hooks/use-platforms";
+import { useSocialAuth } from "@/hooks/use-social-auth";
 import { Platform } from "@/types";
 import { LoadingSingleCard } from "../ui/loading";
 import { toast } from "sonner";
@@ -33,14 +34,24 @@ interface SocialPlatform {
 }
 
 const socialPlatforms: SocialPlatform[] = [
+  // {
+  //   id: "youtube",
+  //   name: "YouTube",
+  //   icon: Youtube,
+  //   color: "text-red-400",
+  //   bgColor: "bg-red-500/10 border-red-500/20",
+  //   description: "Analyze comments from your YouTube videos and live streams",
+  //   features: ["Video comments", "Live chat", "Community posts", "Shorts comments"],
+  //   connected: false,
+  // },
   {
-    id: "youtube",
-    name: "YouTube",
-    icon: Youtube,
-    color: "text-red-400",
-    bgColor: "bg-red-500/10 border-red-500/20",
-    description: "Analyze comments from your YouTube videos and live streams",
-    features: ["Video comments", "Live chat", "Community posts", "Shorts comments"],
+    id: "tiktok",
+    name: "TikTok",
+    icon: TikTokIcon,
+    color: "text-purple-400",
+    bgColor: "bg-purple-500/10 border-purple-500/20",
+    description: "Analyze comments and engagement on your TikTok content",
+    features: ["Video comments", "Live comments", "Duet responses", "Trend analysis"],
     connected: false,
   },
   {
@@ -73,21 +84,12 @@ const socialPlatforms: SocialPlatform[] = [
     features: ["Tweet replies", "Mentions", "Quote tweets", "Thread analysis"],
     connected: false,
   },
-  {
-    id: "tiktok",
-    name: "TikTok",
-    icon: TikTokIcon,
-    color: "text-purple-400",
-    bgColor: "bg-purple-500/10 border-purple-500/20",
-    description: "Analyze comments and engagement on your TikTok content",
-    features: ["Video comments", "Live comments", "Duet responses", "Trend analysis"],
-    connected: false,
-  },
 ];
 
 export function ConnectSocialModal({ open, onOpenChange }: ConnectSocialModalProps) {
   const [connectedPlatforms, setConnectedPlatforms] = useState<Set<string>>(new Set());
   const { isConnecting, isLoading, connectedPlatforms: connectedPlatformsData, refetch } = usePlatforms();
+  const { isBackendAuthenticated } = useSocialAuth();
 
   useEffect(() => {
     refetch();
@@ -103,7 +105,10 @@ export function ConnectSocialModal({ open, onOpenChange }: ConnectSocialModalPro
       <DialogContent className="max-w-4xl bg-black/95 border-white/10 text-white">
         <DialogHeader>
           <DialogTitle className="text-2xl font-bold text-white">Connect Social Platforms</DialogTitle>
-          <DialogDescription className="text-gray-400">Connect your social media accounts to start analyzing comments and engagement</DialogDescription>
+          <DialogDescription className="text-gray-400">
+            Connect your social media accounts to start analyzing comments and engagement.
+            {!isBackendAuthenticated && <span className="block mt-2 text-amber-400 text-sm">⚠️ Please log in to your EchoMind account first to connect social platforms.</span>}
+          </DialogDescription>
         </DialogHeader>
 
         <div className="max-h-[75vh] overflow-y-auto">
@@ -116,7 +121,7 @@ export function ConnectSocialModal({ open, onOpenChange }: ConnectSocialModalPro
                 <LoadingSingleCard className="h-70" />
               </>
             ) : (
-              socialPlatforms.map((platform) => <PlatformConnectItem key={platform.id} platform={platform} isConnected={connectedPlatforms.has(platform.id.toUpperCase())} isConnecting={isConnecting} />)
+              socialPlatforms.map((platform) => <PlatformConnectItem key={platform.id} platform={platform} isConnected={connectedPlatforms.has(platform.id.toUpperCase())} isConnecting={isConnecting} refetchPlatforms={refetch} />)
             )}
           </div>
 
@@ -128,6 +133,8 @@ export function ConnectSocialModal({ open, onOpenChange }: ConnectSocialModalPro
                 View setup guide
               </Button>
             </div>
+
+            {!isBackendAuthenticated && <div className="text-xs text-amber-400 bg-amber-500/10 px-3 py-2 rounded-lg border border-amber-500/20">🔒 Login required to connect social accounts</div>}
           </div>
         </div>
       </DialogContent>
@@ -135,119 +142,181 @@ export function ConnectSocialModal({ open, onOpenChange }: ConnectSocialModalPro
   );
 }
 
-function PlatformConnectItem({ platform, isConnected, isConnecting }: { platform: SocialPlatform; isConnected: boolean; isConnecting: boolean }) {
-  const { disconnectPlatform, connectPlatform, isLoading: loadingConnectedPlatforms } = usePlatforms();
+/**
+ *
+ *
+ *
+ *
+ *
+ *
+ *
+ *
+ *
+ *
+ *
+ *
+ *
+ *
+ *
+ *
+ *
+ *
+ *
+ *
+ *
+ *
+ *
+ *
+ *
+ *
+ *
+ *
+ *
+ *
+ *
+ *
+ *
+ *
+ *
+ *
+ *
+ *
+ *
+ *
+ *
+ *
+ */
 
-  // Handle Facebook token after SDK login
-  const handleFacebookToken = async (accessToken: string, userID: string) => {
+interface PlatformConnectItem {
+  platform: SocialPlatform;
+  isConnected: boolean;
+  isConnecting: boolean;
+  refetchPlatforms: () => void;
+}
+
+function PlatformConnectItem({ platform, isConnected, isConnecting, refetchPlatforms }: PlatformConnectItem) {
+  const { disconnectPlatform, connectPlatform, isLoading: loadingConnectedPlatforms } = usePlatforms();
+  const { connectFacebook, connectTwitter, disconnectAccount, isConnected: isAuthConnected, canConnectSocial, isBackendAuthenticated, socialSession } = useSocialAuth();
+
+  // Handle social media connections using NextAuth
+  const handleConnect = async (platformId: string) => {
+    if (socialPlatforms.find((p) => p.id === platformId)?.comingSoon) return;
+
+    // STRICT REQUIREMENT: User must be authenticated with your backend
+    if (!isBackendAuthenticated) {
+      toast.error("You must be logged in to your EchoMind account before connecting social media platforms. Please log in first.");
+      return;
+    }
+
+    switch (platformId) {
+      case "facebook":
+      case "instagram": // Instagram uses Facebook auth
+        await connectFacebook();
+        break;
+      case "twitter":
+        const status = await connectTwitter();
+        console.log("Twitter connection status:", status);
+
+        // For Twitter, the connection happens in a new tab
+        // We'll listen for the success message and then sync with backend
+        if (status) {
+          // Set up listener for Twitter auth completion
+          setupTwitterAuthListener();
+        }
+        break;
+      default:
+        // For other platforms, use the existing API
+        connectPlatform(platformId as Platform);
+        break;
+    }
+  };
+
+  /**
+   * Set up listener for Twitter authentication completion
+   */
+  const setupTwitterAuthListener = () => {
+    const messageListener = (event: MessageEvent) => {
+      if (event.origin !== window.location.origin) return;
+
+      if (event.data.type === "TWITTER_AUTH_SUCCESS") {
+        window.removeEventListener("message", messageListener);
+        toast.success("Twitter authentication completed!");
+
+        // Wait a moment for the session to update, then sync with backend
+        setTimeout(async () => {
+          await syncTwitterWithBackend();
+        }, 2000);
+      } else if (event.data.type === "TWITTER_AUTH_ERROR") {
+        window.removeEventListener("message", messageListener);
+        toast.error("Twitter authentication failed");
+      } else if (event.data.type === "TWITTER_AUTH_CANCELLED") {
+        window.removeEventListener("message", messageListener);
+        toast.info("Twitter authentication was cancelled");
+      }
+    };
+
+    window.addEventListener("message", messageListener);
+
+    // Clean up listener after 10 minutes
+    setTimeout(() => {
+      window.removeEventListener("message", messageListener);
+    }, 600000);
+  };
+
+  /**
+   * Sync Twitter connection with backend after NextAuth success
+   */
+  const syncTwitterWithBackend = async () => {
     try {
-      // Send Facebook token to your backend to complete OAuth flow
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001"}/api/oauth/facebook/token`, {
+      if (!socialSession || socialSession.provider !== "twitter") {
+        toast.error("No Twitter session found");
+        return;
+      }
+
+      console.log(socialSession);
+
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/oauth/twitter/token`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        credentials: "include",
+        credentials: "include", // Include cookies for backend auth
         body: JSON.stringify({
-          accessToken,
-          userID,
+          accessToken: socialSession.accessToken,
+          refreshToken: socialSession.refreshToken,
+          providerAccountId: socialSession.providerAccountId,
+          userProfile: socialSession.user,
         }),
       });
 
       if (response.ok) {
-        // Successfully connected Facebook
-        window.location.reload(); // Refresh to update connection status
+        const result = await response.json();
+        toast.success("Twitter account synced with backend successfully!");
+        console.log("Twitter sync result:", result);
+
+        // Refresh the connected platforms list
+        refetchPlatforms();
       } else {
-        console.error("Failed to connect Facebook account");
+        const errorData = await response.json().catch(() => ({}));
+        console.error("Failed to sync Twitter with backend:", errorData);
+        toast.error("Failed to sync Twitter account with backend");
       }
     } catch (error) {
-      console.error("Error connecting Facebook:", error);
+      console.error("Error syncing Twitter with backend:", error);
+      toast.error("Network error while syncing Twitter account");
     }
-  };
-
-  // Check if Facebook SDK is ready
-  const isFacebookSDKReady = () => {
-    return typeof window !== "undefined" && window.FB && window.FB.init;
-  };
-
-  // Wait for Facebook SDK to be ready
-  const waitForFacebookSDK = (): Promise<void> => {
-    return new Promise((resolve, reject) => {
-      if (isFacebookSDKReady()) {
-        resolve();
-        return;
-      }
-
-      let attempts = 0;
-      const maxAttempts = 50; // 5 seconds max wait
-      const checkInterval = setInterval(() => {
-        attempts++;
-        if (isFacebookSDKReady()) {
-          clearInterval(checkInterval);
-          resolve();
-        } else if (attempts >= maxAttempts) {
-          clearInterval(checkInterval);
-          reject(new Error("Facebook SDK failed to load"));
-        }
-      }, 100);
-    });
-  };
-
-  const handleConnect = async (platformId: string) => {
-    if (socialPlatforms.find((p) => p.id === platformId)?.comingSoon) return;
-
-    if (platformId === "facebook") {
-      // Check if we're on HTTPS (required for Facebook login)
-      if (typeof window !== "undefined" && window.location.protocol !== "https:" && window.location.hostname !== "localhost") {
-        console.error("Facebook login requires HTTPS");
-        toast.error("Facebook login requires a secure connection (HTTPS). Please use HTTPS or localhost for development.");
-        return;
-      }
-
-      try {
-        // Wait for Facebook SDK to be ready
-        await waitForFacebookSDK();
-
-        // Use proper typing for Facebook response
-        window.FB.login(
-          function (response: { status: "connected" | "not_authorized" | "unknown"; authResponse?: { accessToken: string; userID: string; expiresIn: number; signedRequest: string } }) {
-            if (response.authResponse) {
-              // User logged in successfully
-              const accessToken = response.authResponse.accessToken;
-              const userID = response.authResponse.userID;
-
-              console.log(accessToken);
-              console.log(userID);
-
-              // Send token to your backend
-              handleFacebookToken(accessToken, userID);
-            } else {
-              console.error("Facebook login failed:", response);
-              if (response.status === "not_authorized") {
-                alert("Please authorize the app to connect your Facebook account.");
-              } else if (response.status === "unknown") {
-                alert("Facebook login failed. Please try again.");
-              }
-            }
-          },
-          { scope: "public_profile,email,pages_read_engagement,pages_show_list" }
-        );
-      } catch (error) {
-        console.error("Facebook SDK not available:", error);
-        alert("Facebook SDK is not available. Please refresh the page and try again.");
-      }
-
-      return;
-    }
-
-    // Simulate API call
-    connectPlatform(platformId as Platform);
   };
 
   const handleDisconnect = async (platformId: string) => {
     if (socialPlatforms.find((p) => p.id === platformId)?.comingSoon) return;
-    // Simulate API call
-    disconnectPlatform(platformId as Platform);
+
+    // For social auth platforms, use NextAuth disconnect
+    if (["facebook", "instagram", "twitter"].includes(platformId)) {
+      await disconnectAccount();
+    } else {
+      // For other platforms, use the existing API
+      disconnectPlatform(platformId as Platform);
+    }
   };
 
   const Icon = platform.icon;
@@ -286,6 +355,9 @@ function PlatformConnectItem({ platform, isConnected, isConnecting }: { platform
           </div>
         </div>
         <Separator className="bg-white/10" />
+
+        {!isBackendAuthenticated && !isConnected && <div className="text-xs text-amber-400 bg-amber-500/10 px-3 py-2 rounded border border-amber-500/20">Please log in to your EchoMind account to connect {platform.name}</div>}
+
         <div className="flex gap-2">
           {isConnected ? (
             <>
@@ -298,7 +370,7 @@ function PlatformConnectItem({ platform, isConnected, isConnecting }: { platform
               </Button>
             </>
           ) : (
-            <Button size="sm" className={`flex-1 ${platform.comingSoon ? "bg-gray-600 hover:bg-gray-600 cursor-not-allowed" : "bg-blue-600 hover:bg-blue-700"}`} onClick={() => handleConnect(platform.id)} disabled={loadingConnectedPlatforms || isConnecting || platform.comingSoon}>
+            <Button size="sm" className={`flex-1 ${platform.comingSoon ? "bg-gray-600 hover:bg-gray-600 cursor-not-allowed" : !isBackendAuthenticated ? "bg-amber-600 hover:bg-amber-700" : "bg-blue-600 hover:bg-blue-700"}`} onClick={() => handleConnect(platform.id)} disabled={loadingConnectedPlatforms || isConnecting || platform.comingSoon}>
               {isConnecting ? (
                 <>
                   <Loader2 className="w-4 h-4 mr-2 animate-spin" />
@@ -308,6 +380,11 @@ function PlatformConnectItem({ platform, isConnected, isConnecting }: { platform
                 <>
                   <AlertCircle className="w-4 h-4 mr-2" />
                   Coming Soon
+                </>
+              ) : !isBackendAuthenticated ? (
+                <>
+                  <AlertCircle className="w-4 h-4 mr-2" />
+                  Login Required
                 </>
               ) : (
                 <>

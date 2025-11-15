@@ -182,9 +182,9 @@ npm run dev
 
 ### 4. Access the Application
 
-- **Frontend**: http://localhost:3001
-- **API**: http://localhost:3000
-- **API Documentation**: http://localhost:3000/docs
+- **Frontend**: http://localhost:5628
+- **API**: http://localhost:5628
+- **API Documentation**: http://localhost:5628/docs
 - **Grafana Monitoring**: http://localhost:3002 (admin/admin)
 
 ### 5. Demo Login
@@ -304,7 +304,7 @@ npx prisma studio
 
 The API is fully documented using OpenAPI 3.0 specification:
 
-- **Interactive Docs**: http://localhost:3000/docs
+- **Interactive Docs**: http://localhost:5628/docs
 - **OpenAPI Spec**: `backend/docs/openapi.yaml`
 - **Postman Collection**: Available in `backend/docs/`
 
@@ -386,16 +386,16 @@ The application includes comprehensive monitoring:
 
 ```bash
 # API health
-curl http://localhost:3000/health
+curl http://localhost:5628/health
 
 # Detailed system status
-curl http://localhost:3000/health/detailed
+curl http://localhost:5628/health/detailed
 
 # Database connectivity
-curl http://localhost:3000/health/db
+curl http://localhost:5628/health/db
 
 # External services
-curl http://localhost:3000/health/external
+curl http://localhost:5628/health/external
 ```
 
 ### Logging
@@ -546,7 +546,7 @@ docker-compose exec redis redis-cli FLUSHALL
 
 ```bash
 # Verify OAuth credentials
-curl -X GET "http://localhost:3000/auth/google/callback?code=test"
+curl -X GET "http://localhost:5628/auth/google/callback?code=test"
 
 # Check OAuth redirect URLs in platform settings
 # Ensure URLs match exactly (including http/https)

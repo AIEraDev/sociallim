@@ -975,7 +975,7 @@ services:
   api:
     build: .
     ports:
-      - "3000:3000"
+      - "3000:5628"
     environment:
       - NODE_ENV=development
       - DATABASE_URL=postgresql://user:pass@db:5432/analyzer

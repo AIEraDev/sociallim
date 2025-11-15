@@ -182,8 +182,8 @@ deploy_services() {
 run_health_checks() {
     log_info "Running health checks..."
     
-    local api_url="${API_BASE_URL:-http://localhost:3000}"
-    local frontend_url="${FRONTEND_URL:-http://localhost:3001}"
+    local api_url="${API_BASE_URL:-http://localhost:5628}"
+    local frontend_url="${FRONTEND_URL:-http://localhost:5628}"
     local timeout=$HEALTH_CHECK_TIMEOUT
     
     # Check API health
@@ -257,7 +257,7 @@ run_health_checks() {
 run_smoke_tests() {
     log_info "Running smoke tests..."
     
-    local api_url="${API_BASE_URL:-http://localhost:3000}"
+    local api_url="${API_BASE_URL:-http://localhost:5628}"
     
     # Test API endpoints
     local endpoints=(
@@ -389,12 +389,12 @@ main() {
     log_info "   Environment: $DEPLOY_ENV"
     log_info "   Version: $DEPLOY_VERSION"
     log_info "   Duration: $duration seconds"
-    log_info "   API URL: ${API_BASE_URL:-http://localhost:3000}"
-    log_info "   Frontend URL: ${FRONTEND_URL:-http://localhost:3001}"
+    log_info "   API URL: ${API_BASE_URL:-http://localhost:5628}"
+    log_info "   Frontend URL: ${FRONTEND_URL:-http://localhost:5628}"
     echo ""
     log_info "🔍 Monitor the deployment:"
     log_info "   Logs: docker-compose logs -f"
-    log_info "   Health: curl ${API_BASE_URL:-http://localhost:3000}/health"
+    log_info "   Health: curl ${API_BASE_URL:-http://localhost:5628}/health"
     echo ""
 }
 

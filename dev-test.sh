@@ -65,8 +65,8 @@ case "$1" in
         sleep 5
         start_frontend
         echo "🎉 Development servers started!"
-        echo "Backend: http://localhost:3001"
-        echo "Frontend: http://localhost:3000"
+        echo "Backend: http://localhost:5628"
+        echo "Frontend: http://localhost:5628"
         ;;
     "test")
         run_tests
@@ -75,8 +75,8 @@ case "$1" in
         setup_database
         ;;
     "check")
-        check_service "http://localhost:3001/health" "Backend API"
-        check_service "http://localhost:3000" "Frontend App"
+        check_service "http://localhost:5628/health" "Backend API"
+        check_service "http://localhost:5628" "Frontend App"
         ;;
     *)
         echo "Usage: $0 {start|test|setup|check}"
