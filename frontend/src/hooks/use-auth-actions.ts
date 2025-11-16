@@ -20,6 +20,7 @@ export function useAuthActions() {
   // Login mutation
   const loginMutation = useMutation({
     mutationFn: async (credentials: LoginRequest) => {
+      console.log("LOGIN DATA:", credentials);
       const response = await apiClient.login(credentials);
       if (!response.success) {
         throw new Error(response.error?.message || "Login failed");

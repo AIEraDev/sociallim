@@ -1,19 +1,17 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { X, CheckCircle, ExternalLink, Loader2, AlertCircle, Facebook, Instagram } from "lucide-react";
+import { X, CheckCircle, ExternalLink, Loader2, Facebook, Instagram } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Separator } from "@/components/ui/separator";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { TikTokIcon } from "../Icons";
 import { usePlatforms } from "@/hooks/use-platforms";
-import { useSocialAuth } from "@/hooks/use-social-auth";
 import { Platform } from "@/types";
 import { LoadingSingleCard } from "../ui/loading";
-import { toast } from "sonner";
+import { useTwitterAuth } from "@/hooks/useTwitterAuth";
 
 interface ConnectSocialModalProps {
   open: boolean;
@@ -44,6 +42,7 @@ const socialPlatforms: SocialPlatform[] = [
   //   features: ["Video comments", "Live chat", "Community posts", "Shorts comments"],
   //   connected: false,
   // },
+
   {
     id: "tiktok",
     name: "TikTok",
@@ -52,6 +51,16 @@ const socialPlatforms: SocialPlatform[] = [
     bgColor: "bg-purple-500/10 border-purple-500/20",
     description: "Analyze comments and engagement on your TikTok content",
     features: ["Video comments", "Live comments", "Duet responses", "Trend analysis"],
+    connected: false,
+  },
+  {
+    id: "twitter",
+    name: "Twitter/X",
+    icon: X,
+    color: "text-blue-400",
+    bgColor: "bg-blue-500/10 border-blue-500/20",
+    description: "Track mentions, replies, and engagement across tweets",
+    features: ["Tweet replies", "Mentions", "Quote tweets", "Thread analysis"],
     connected: false,
   },
   {
@@ -74,22 +83,11 @@ const socialPlatforms: SocialPlatform[] = [
     features: ["Page posts", "Post comments", "Page insights", "Reactions"],
     connected: false,
   },
-  {
-    id: "twitter",
-    name: "Twitter/X",
-    icon: X,
-    color: "text-blue-400",
-    bgColor: "bg-blue-500/10 border-blue-500/20",
-    description: "Track mentions, replies, and engagement across tweets",
-    features: ["Tweet replies", "Mentions", "Quote tweets", "Thread analysis"],
-    connected: false,
-  },
 ];
 
 export function ConnectSocialModal({ open, onOpenChange }: ConnectSocialModalProps) {
   const [connectedPlatforms, setConnectedPlatforms] = useState<Set<string>>(new Set());
   const { isConnecting, isLoading, connectedPlatforms: connectedPlatformsData, refetch } = usePlatforms();
-  const { isBackendAuthenticated } = useSocialAuth();
 
   useEffect(() => {
     refetch();
@@ -105,10 +103,7 @@ export function ConnectSocialModal({ open, onOpenChange }: ConnectSocialModalPro
       <DialogContent className="max-w-4xl bg-black/95 border-white/10 text-white">
         <DialogHeader>
           <DialogTitle className="text-2xl font-bold text-white">Connect Social Platforms</DialogTitle>
-          <DialogDescription className="text-gray-400">
-            Connect your social media accounts to start analyzing comments and engagement.
-            {!isBackendAuthenticated && <span className="block mt-2 text-amber-400 text-sm">⚠️ Please log in to your EchoMind account first to connect social platforms.</span>}
-          </DialogDescription>
+          <DialogDescription className="text-gray-400">Connect your social media accounts to start analyzing comments and engagement.</DialogDescription>
         </DialogHeader>
 
         <div className="max-h-[75vh] overflow-y-auto">
@@ -133,8 +128,6 @@ export function ConnectSocialModal({ open, onOpenChange }: ConnectSocialModalPro
                 View setup guide
               </Button>
             </div>
-
-            {!isBackendAuthenticated && <div className="text-xs text-amber-400 bg-amber-500/10 px-3 py-2 rounded-lg border border-amber-500/20">🔒 Login required to connect social accounts</div>}
           </div>
         </div>
       </DialogContent>
@@ -194,36 +187,29 @@ interface PlatformConnectItem {
   refetchPlatforms: () => void;
 }
 
-function PlatformConnectItem({ platform, isConnected, isConnecting, refetchPlatforms }: PlatformConnectItem) {
+function PlatformConnectItem({ platform, isConnected, isConnecting }: PlatformConnectItem) {
   const { disconnectPlatform, connectPlatform, isLoading: loadingConnectedPlatforms } = usePlatforms();
-  const { connectFacebook, connectTwitter, disconnectAccount, isBackendAuthenticated, socialSession } = useSocialAuth();
+  const { isConnectingTwitter, connectTwitter } = useTwitterAuth();
 
   // Handle social media connections using NextAuth
   const handleConnect = async (platformId: string) => {
     if (socialPlatforms.find((p) => p.id === platformId)?.comingSoon) return;
 
-    // STRICT REQUIREMENT: User must be authenticated with your backend
-    if (!isBackendAuthenticated) {
-      toast.error("You must be logged in to your EchoMind account before connecting social media platforms. Please log in first.");
-      return;
-    }
-
     switch (platformId) {
       case "facebook":
       case "instagram": // Instagram uses Facebook auth
-        await connectFacebook();
+        // await connectFacebook();
         break;
       case "twitter":
-        const status = await connectTwitter();
-        console.log("Twitter connection status:", status);
-
-        // If auth is successful, sync with backend
-        if (status) {
-          // Wait a moment for the session to update, then sync
-          setTimeout(async () => {
-            await syncTwitterWithBackend();
-          }, 2000);
-        }
+        connectTwitter();
+        // const status = await connectTwitter();
+        // // If auth is successful, sync with backend
+        // if (status) {
+        //   // Wait a moment for the session to update, then sync
+        //   setTimeout(async () => {
+        //     await syncTwitterWithBackend();
+        //   }, 2000);
+        // }
         break;
       default:
         // For other platforms, use the existing API
@@ -232,56 +218,12 @@ function PlatformConnectItem({ platform, isConnected, isConnecting, refetchPlatf
     }
   };
 
-  /**
-   * Sync Twitter connection with backend after NextAuth success
-   */
-  const syncTwitterWithBackend = async () => {
-    try {
-      if (!socialSession || socialSession.provider !== "twitter") {
-        toast.error("No Twitter session found");
-        return;
-      }
-
-      console.log(socialSession);
-
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/oauth/twitter/token`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        credentials: "include", // Include cookies for backend auth
-        body: JSON.stringify({
-          accessToken: socialSession.accessToken,
-          refreshToken: socialSession.refreshToken,
-          providerAccountId: socialSession.providerAccountId,
-          userProfile: socialSession.user,
-        }),
-      });
-
-      if (response.ok) {
-        const result = await response.json();
-        toast.success("Twitter account synced with backend successfully!");
-        console.log("Twitter sync result:", result);
-
-        // Refresh the connected platforms list
-        refetchPlatforms();
-      } else {
-        const errorData = await response.json().catch(() => ({}));
-        console.error("Failed to sync Twitter with backend:", errorData);
-        toast.error("Failed to sync Twitter account with backend");
-      }
-    } catch (error) {
-      console.error("Error syncing Twitter with backend:", error);
-      toast.error("Network error while syncing Twitter account");
-    }
-  };
-
   const handleDisconnect = async (platformId: string) => {
     if (socialPlatforms.find((p) => p.id === platformId)?.comingSoon) return;
 
     // For social auth platforms, use NextAuth disconnect
     if (["facebook", "instagram", "twitter"].includes(platformId)) {
-      await disconnectAccount();
+      // await disconnectAccount();
     } else {
       // For other platforms, use the existing API
       disconnectPlatform(platformId as Platform);
@@ -310,7 +252,7 @@ function PlatformConnectItem({ platform, isConnected, isConnecting, refetchPlatf
           {isConnected && <CheckCircle className="w-5 h-5 text-green-400" />}
         </div>
       </CardHeader>
-      <CardContent className="space-y-4">
+      <CardContent className="space-y-4 flex-1 flex flex-col">
         <p className="text-gray-300 text-sm">{platform.description}</p>
         <div className="space-y-2">
           <h4 className="text-white font-medium text-sm">Features:</h4>
@@ -323,11 +265,8 @@ function PlatformConnectItem({ platform, isConnected, isConnecting, refetchPlatf
             ))}
           </div>
         </div>
-        <Separator className="bg-white/10" />
 
-        {!isBackendAuthenticated && !isConnected && <div className="text-xs text-amber-400 bg-amber-500/10 px-3 py-2 rounded border border-amber-500/20">Please log in to your EchoMind account to connect {platform.name}</div>}
-
-        <div className="flex gap-2">
+        <div className="flex gap-2 mt-auto border-t border-t-white/10 pt-4">
           {isConnected ? (
             <>
               <Button size="sm" variant="outline" className="flex-1 border-green-500/20 bg-green-500/10 text-green-400 hover:bg-green-500/20" disabled={loadingConnectedPlatforms}>
@@ -339,21 +278,11 @@ function PlatformConnectItem({ platform, isConnected, isConnecting, refetchPlatf
               </Button>
             </>
           ) : (
-            <Button size="sm" className={`flex-1 ${platform.comingSoon ? "bg-gray-600 hover:bg-gray-600 cursor-not-allowed" : !isBackendAuthenticated ? "bg-amber-600 hover:bg-amber-700" : "bg-blue-600 hover:bg-blue-700"}`} onClick={() => handleConnect(platform.id)} disabled={loadingConnectedPlatforms || isConnecting || platform.comingSoon}>
-              {isConnecting ? (
+            <Button size="sm" className={`flex-1 ${platform.comingSoon ? "bg-gray-600 hover:bg-gray-600 cursor-not-allowed" : "bg-blue-600 hover:bg-blue-700"}`} onClick={() => handleConnect(platform.id)} disabled={loadingConnectedPlatforms || isConnecting || platform.comingSoon}>
+              {isConnecting || isConnectingTwitter ? (
                 <>
                   <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                   Connecting...
-                </>
-              ) : platform.comingSoon ? (
-                <>
-                  <AlertCircle className="w-4 h-4 mr-2" />
-                  Coming Soon
-                </>
-              ) : !isBackendAuthenticated ? (
-                <>
-                  <AlertCircle className="w-4 h-4 mr-2" />
-                  Login Required
                 </>
               ) : (
                 <>

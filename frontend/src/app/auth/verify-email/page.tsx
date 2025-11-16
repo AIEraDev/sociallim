@@ -8,32 +8,15 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/use-auth";
-
-// Loading component for Suspense fallback
-function VerifyEmailLoading() {
-  return (
-    <div className="min-h-screen bg-gradient-dark flex items-center justify-center p-4">
-      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6 }} className="w-full max-w-md">
-        <Card className="glass-card border-white/20 shadow-2xl">
-          <CardHeader className="text-center pb-6">
-            <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ delay: 0.2, type: "spring", stiffness: 200 }} className="flex justify-center mb-4">
-              <Loader2 className="h-16 w-16 text-purple-400 animate-spin" />
-            </motion.div>
-            <CardTitle className="text-2xl font-bold text-white">Loading...</CardTitle>
-            <CardDescription className="text-gray-300">Preparing email verification...</CardDescription>
-          </CardHeader>
-        </Card>
-      </motion.div>
-    </div>
-  );
-}
+import { useAuthActions } from "@/hooks/use-auth-actions";
 
 // Component that uses useSearchParams
 function VerifyEmailContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const token = searchParams.get("token");
-  const { isVerifyingEmail, verifyEmail, verifyEmailError, user } = useAuth();
+  const { user } = useAuth();
+  const { isVerifyingEmail, verifyEmail, verifyEmailError } = useAuthActions();
   const [hasTriedVerification, setHasTriedVerification] = useState(false);
 
   // Determine the current status based on auth hook state
@@ -225,5 +208,24 @@ export default function VerifyEmailPage() {
     <Suspense fallback={<VerifyEmailLoading />}>
       <VerifyEmailContent />
     </Suspense>
+  );
+}
+
+// Loading component for Suspense fallback
+function VerifyEmailLoading() {
+  return (
+    <div className="min-h-screen bg-gradient-dark flex items-center justify-center p-4">
+      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6 }} className="w-full max-w-md">
+        <Card className="glass-card border-white/20 shadow-2xl">
+          <CardHeader className="text-center pb-6">
+            <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ delay: 0.2, type: "spring", stiffness: 200 }} className="flex justify-center mb-4">
+              <Loader2 className="h-16 w-16 text-purple-400 animate-spin" />
+            </motion.div>
+            <CardTitle className="text-2xl font-bold text-white">Loading...</CardTitle>
+            <CardDescription className="text-gray-300">Preparing email verification...</CardDescription>
+          </CardHeader>
+        </Card>
+      </motion.div>
+    </div>
   );
 }

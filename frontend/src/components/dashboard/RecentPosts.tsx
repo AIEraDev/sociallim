@@ -9,7 +9,12 @@ import { usePlatformStore } from "@/stores/platformStore";
 import { usePlatformPosts } from "@/hooks/use-platforms";
 import { Platform, Post } from "@/types";
 import { formatDate, formatNumber } from "@/helpers/utils";
-import { TikTokIcon } from "../Icons";
+
+import { AiFillTikTok } from "react-icons/ai";
+import { BiLogoInstagramAlt } from "react-icons/bi";
+import { FaFacebook, FaReddit, FaYoutube } from "react-icons/fa";
+import { FaSquareXTwitter } from "react-icons/fa6";
+import { type IconType } from "react-icons";
 
 export default function RecentPosts() {
   const { setIsConnectModalOpen } = usePlatformStore();
@@ -105,13 +110,15 @@ export default function RecentPosts() {
 
 const getPlatformIcon = (platform: Platform) => {
   // You can replace these with actual platform icons
-  const icons = {
-    TIKTOK: TikTokIcon,
-    YOUTUBE: "📺",
-    INSTAGRAM: "📷",
-    TWITTER: "🐦",
+  const icons: Record<Platform, IconType> = {
+    [Platform.TIKTOK]: AiFillTikTok,
+    [Platform.INSTAGRAM]: BiLogoInstagramAlt,
+    [Platform.FACEBOOK]: FaFacebook,
+    [Platform.TWITTER]: FaSquareXTwitter,
+    [Platform.YOUTUBE]: FaYoutube, // You'll need to import this
   };
-  return icons[platform] || "📱";
+
+  return icons[platform] || FaReddit;
 };
 
 function PostItem({ post }: { post: Post }) {

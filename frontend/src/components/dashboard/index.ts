@@ -1,5 +1,4 @@
 export { Sidebar } from "./Sidebar";
-export { Topbar } from "./topbar";
 export { KPICard } from "./kpi-card";
 export { PostCard } from "./post-card";
 export { InsightsCarousel } from "./insights-carousel";

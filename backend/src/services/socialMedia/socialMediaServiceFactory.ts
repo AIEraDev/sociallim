@@ -1,5 +1,5 @@
 import { Platform } from "@prisma/client";
-import { ISocialMediaService } from "../../types/socialMedia";
+// import { ISocialMediaService } from "../../types/socialMedia";
 import { youtubeService } from "./youtubeService";
 import { instagramService } from "./instagramService";
 import { twitterService } from "./twitterService";
@@ -13,7 +13,7 @@ export class SocialMediaServiceFactory {
   /**
    * Get the social media service for a specific platform
    */
-  static getService(platform: Platform): ISocialMediaService {
+  static getService(platform: Platform) {
     switch (platform) {
       case Platform.YOUTUBE:
         return youtubeService.instance;
@@ -33,7 +33,7 @@ export class SocialMediaServiceFactory {
   /**
    * Get all available social media services
    */
-  static getAllServices(): ISocialMediaService[] {
+  static getAllServices() {
     return [youtubeService.instance, instagramService.instance, twitterService.instance, tiktokService.instance, facebookService.instance];
   }
 

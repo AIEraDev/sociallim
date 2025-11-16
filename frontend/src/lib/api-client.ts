@@ -13,73 +13,36 @@ export interface ApiError {
   code: string;
   status?: number;
   details?: Record<string, unknown>;
-  retryable?: boolean;
   correlationId?: string;
   userMessage?: string;
 }
 
-export interface RetryOptions {
-  maxAttempts?: number;
-  baseDelay?: number;
-  maxDelay?: number;
-  backoffFactor?: number;
-  retryCondition?: (error: ApiError) => boolean;
+export interface TwitterAuthResponse {
+  success: boolean;
+  authUrl: string;
+  state: string;
 }
 
-// Circuit breaker for external service calls
-class CircuitBreaker {
-  private failures = 0;
-  private lastFailureTime = 0;
-  private state: "CLOSED" | "OPEN" | "HALF_OPEN" = "CLOSED";
-
-  constructor(
-    private failureThreshold: number = 3,
-    private recoveryTimeout: number = 30000 // 30 seconds
-  ) {}
-
-  async execute<T>(operation: () => Promise<T>): Promise<T> {
-    if (this.state === "OPEN") {
-      if (Date.now() - this.lastFailureTime > this.recoveryTimeout) {
-        this.state = "HALF_OPEN";
-      } else {
-        throw new Error("Service temporarily unavailable. Please try again later.");
-      }
-    }
-
-    try {
-      const result = await operation();
-      this.onSuccess();
-      return result;
-    } catch (error) {
-      this.onFailure();
-      throw error;
-    }
-  }
-
-  private onSuccess() {
-    this.failures = 0;
-    this.state = "CLOSED";
-  }
-
-  private onFailure() {
-    this.failures++;
-    this.lastFailureTime = Date.now();
-
-    if (this.failures >= this.failureThreshold) {
-      this.state = "OPEN";
-    }
-  }
+export interface TwitterCallbackResponse {
+  success: boolean;
+  message: string;
+  user: {
+    id: string;
+    name: string;
+    username: string;
+    profileImage?: string;
+    followersCount?: number;
+    followingCount?: number;
+  };
 }
 
 class ApiClient {
   private baseURL: string;
   private token: string | null = null;
-  private circuitBreaker: CircuitBreaker;
   private requestQueue: Map<string, Promise<unknown>> = new Map();
 
   constructor(baseURL: string = env.API_URL) {
     this.baseURL = baseURL;
-    this.circuitBreaker = new CircuitBreaker();
   }
 
   /**
@@ -89,44 +52,6 @@ class ApiClient {
     const method = options.method || "GET";
     const body = options.body || "";
     return `${method}:${endpoint}:${typeof body === "string" ? body : JSON.stringify(body)}`;
-  }
-
-  /**
-   * Retry mechanism with exponential backoff
-   */
-  private async withRetry<T>(operation: () => Promise<T>, options: RetryOptions = {}): Promise<T> {
-    const { maxAttempts = 3, baseDelay = 1000, maxDelay = 10000, backoffFactor = 2, retryCondition = (error) => error.retryable || error.code === "NETWORK_ERROR" || (error.status && error.status >= 500) } = options;
-
-    let lastError: ApiError;
-
-    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-      try {
-        return await operation();
-      } catch (error) {
-        lastError = error as ApiError;
-
-        // Don't retry if this is the last attempt or if retry condition is not met
-        if (attempt === maxAttempts || !retryCondition(lastError)) {
-          throw error;
-        }
-
-        // Calculate delay with exponential backoff and jitter
-        const jitter = Math.random() * 0.1 * baseDelay;
-        const delay = Math.min(baseDelay * Math.pow(backoffFactor, attempt - 1) + jitter, maxDelay);
-
-        console.warn(`Request failed (attempt ${attempt}/${maxAttempts}), retrying in ${Math.round(delay)}ms:`, {
-          error: lastError.message,
-          code: lastError.code,
-          attempt,
-          maxAttempts,
-        });
-
-        // Wait before retrying
-        await new Promise((resolve) => setTimeout(resolve, delay));
-      }
-    }
-
-    throw lastError!;
   }
 
   /**
@@ -153,9 +78,9 @@ class ApiClient {
   }
 
   /**
-   * Make HTTP request with comprehensive error handling, retry logic, and deduplication
+   * Make HTTP request with comprehensive error handling and deduplication
    */
-  private async request<T>(endpoint: string, options: RequestInit = {}, retryOptions?: RetryOptions): Promise<ApiResponse<T>> {
+  private async request<T>(endpoint: string, options: RequestInit = {}): Promise<ApiResponse<T>> {
     const requestKey = this.getRequestKey(endpoint, options);
 
     // Deduplicate identical requests (for GET requests only)
@@ -163,93 +88,88 @@ class ApiClient {
       return this.requestQueue.get(requestKey) as Promise<ApiResponse<T>>;
     }
 
-    const requestPromise = this.circuitBreaker.execute(async () => {
-      return this.withRetry(async () => {
-        const url = `${this.baseURL}${endpoint}`;
+    const requestPromise = (async () => {
+      const url = `${this.baseURL}${endpoint}`;
 
-        const headers: Record<string, string> = {
-          "Content-Type": "application/json",
-          ...(options.headers as Record<string, string>),
-        };
+      const headers: Record<string, string> = {
+        "Content-Type": "application/json",
+        ...(options.headers as Record<string, string>),
+      };
 
-        // For cookie-based auth, no need to add Authorization header
-        // Cookies are automatically sent by the browser with credentials: 'include'
+      // For cookie-based auth, no need to add Authorization header
+      // Cookies are automatically sent by the browser with credentials: 'include'
 
-        // Add correlation ID for request tracking
-        headers["X-Correlation-ID"] = `req_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      // Add correlation ID for request tracking
+      headers["X-Correlation-ID"] = `req_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
 
-        try {
-          const response = await fetch(url, {
-            ...options,
-            headers,
-            signal: controller.signal,
-            credentials: "include", // Include cookies in requests
-          });
+      try {
+        const response = await fetch(url, {
+          ...options,
+          headers,
+          signal: controller.signal,
+          credentials: "include", // Include cookies in requests
+        });
 
-          clearTimeout(timeoutId);
+        clearTimeout(timeoutId);
 
-          let data;
-          const contentType = response.headers.get("content-type");
+        let data;
+        const contentType = response.headers.get("content-type");
 
-          if (contentType && contentType.includes("application/json")) {
-            data = await response.json();
-          } else {
-            data = await response.text();
-          }
-
-          if (!response.ok) {
-            const apiError: ApiError = {
-              message: data?.error?.message || data?.message || `HTTP ${response.status}`,
-              code: data?.error?.code || data?.code || `HTTP_${response.status}`,
-              status: response.status,
-              details: data?.error?.details || data?.details,
-              retryable: data?.error?.retryable || response.status >= 500,
-              correlationId: data?.error?.correlationId,
-              userMessage: data?.error?.message,
-            };
-
-            // Handle authentication errors
-            if (response.status === 401) {
-              this.handleAuthError();
-            }
-
-            throw apiError;
-          }
-
-          return {
-            success: true,
-            data: data?.data || data,
-            message: data?.message,
-          } as ApiResponse<T>;
-        } catch (error) {
-          clearTimeout(timeoutId);
-
-          if (error instanceof Error && error.name === "AbortError") {
-            throw {
-              message: "Request timed out",
-              code: "REQUEST_TIMEOUT",
-              status: 408,
-              retryable: true,
-              userMessage: "Request timed out. Please try again.",
-            } as ApiError;
-          }
-
-          if (error instanceof TypeError && error.message.includes("fetch")) {
-            throw {
-              message: "Network error",
-              code: "NETWORK_ERROR",
-              retryable: true,
-              userMessage: "Unable to connect to the server. Please check your internet connection.",
-            } as ApiError;
-          }
-
-          throw error;
+        if (contentType && contentType.includes("application/json")) {
+          data = await response.json();
+        } else {
+          data = await response.text();
         }
-      }, retryOptions);
-    });
+
+        if (!response.ok) {
+          const apiError: ApiError = {
+            message: data?.error?.message || data?.message || `HTTP ${response.status}`,
+            code: data?.error?.code || data?.code || `HTTP_${response.status}`,
+            status: response.status,
+            details: data?.error?.details || data?.details,
+            correlationId: data?.error?.correlationId,
+            userMessage: data?.error?.message,
+          };
+
+          // Handle authentication errors
+          if (response.status === 401) {
+            this.handleAuthError();
+          }
+
+          throw apiError;
+        }
+
+        return {
+          success: true,
+          data: data?.data || data,
+          message: data?.message,
+        } as ApiResponse<T>;
+      } catch (error) {
+        clearTimeout(timeoutId);
+
+        if (error instanceof Error && error.name === "AbortError") {
+          throw {
+            message: "Request timed out",
+            code: "REQUEST_TIMEOUT",
+            status: 408,
+            userMessage: "Request timed out. Please try again.",
+          } as ApiError;
+        }
+
+        if (error instanceof TypeError && error.message.includes("fetch")) {
+          throw {
+            message: "Network error",
+            code: "NETWORK_ERROR",
+            userMessage: "Unable to connect to the server. Please check your internet connection.",
+          } as ApiError;
+        }
+
+        throw error;
+      }
+    })();
 
     // Cache GET requests
     if (!options.method || options.method === "GET") {
@@ -292,6 +212,7 @@ class ApiClient {
 
   // Authentication endpoints
   async login(credentials: LoginRequest): Promise<ApiResponse<CookieAuthResponse>> {
+    console.log("LOGIN DATA:", credentials);
     const response = await this.request<CookieAuthResponse>("/auth/login", {
       method: "POST",
       body: JSON.stringify(credentials),
@@ -318,9 +239,7 @@ class ApiClient {
 
   async logout(): Promise<void> {
     // Call logout endpoint to clear server-side session and cookies
-    await this.request<void>("/auth/logout", {
-      method: "POST",
-    });
+    await this.request<void>("/auth/logout", { method: "POST", credentials: "include" });
   }
 
   async getProfile(): Promise<ApiResponse<{ user: User }>> {
@@ -365,6 +284,26 @@ class ApiClient {
     return this.request<void>(`/platforms/disconnect/${platform.toLowerCase()}`, {
       method: "DELETE",
     });
+  }
+
+  // Get Twitter authorization URL
+  async getTwitterAuthUrl(): Promise<TwitterAuthResponse> {
+    const response = this.request<TwitterAuthResponse>("/oauth/twitter/authorize");
+    return (await response).data!;
+  }
+
+  // Complete Twitter OAuth callback
+  async completeTwitterAuth(code: string, state: string): Promise<ApiResponse<TwitterCallbackResponse>> {
+    return this.request<TwitterCallbackResponse>("/oauth/twitter/callback", {
+      method: "POST",
+      body: JSON.stringify({ code, state }),
+      credentials: "include",
+    });
+  }
+
+  // Disconnect Twitter account
+  async disconnectTwitter(): Promise<ApiResponse<void>> {
+    return this.request<void>("/oauth/twitter/disconnect", { method: "DELETE" });
   }
 
   // Posts endpoints

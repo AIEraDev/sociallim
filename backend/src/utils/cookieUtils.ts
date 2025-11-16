@@ -27,11 +27,14 @@ export class CookieUtils {
    */
   private static getDefaultOptions(): CookieOptions {
     const isProduction = config.env === "production";
+    // const isCrossOrigin = process.env.FRONTEND_URL?.includes("ngrok") || process.env.FRONTEND_URL?.includes("https");
+
+    console.log("NODE ENVIRONMENT: ", isProduction);
 
     return {
       httpOnly: true,
-      secure: isProduction, // HTTPS only in production
-      sameSite: isProduction ? "none" : "lax", // None in production, lax in development
+      secure: isProduction, // HTTPS required for cross-origin or production
+      sameSite: isProduction ? "none" : "lax", // None for cross-origin, lax for same-origin
       path: "/",
       // domain: isProduction ? ".yourdomain.com" : undefined, // Set domain in production
     };

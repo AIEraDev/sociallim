@@ -319,7 +319,6 @@ export class AuthService {
 
       // Check if session exists and is valid
       const session = await this.getSessionByToken(token);
-      console.log("SESSION: ", session);
 
       if (!session || session.userId !== decoded.userId) {
         return null; // Session not found or user mismatch
@@ -334,8 +333,6 @@ export class AuthService {
           CommonCacheConfigs.userProfile()
         )
       );
-
-      console.log(user);
 
       return user;
     } catch (error) {
@@ -481,23 +478,17 @@ export class AuthService {
     try {
       const expiresAt = new Date(Date.now() + this.TOKEN_EXPIRATION_SECONDS * 1000);
 
-      console.log("Storing user session:", { userId, tokenLength: token.length, expiresAt });
-
       // Remove any existing sessions for this user (single session per user)
-      const deletedSessions = await prisma.userSession.deleteMany({
-        where: { userId },
-      });
-      console.log("Deleted existing sessions:", deletedSessions.count);
+      await prisma.userSession.deleteMany({ where: { userId } });
 
       // Create new session without caching for debugging
-      const newSession = await prisma.userSession.create({
+      await prisma.userSession.create({
         data: {
           token,
           userId,
           expiresAt,
         },
       });
-      console.log("Created new session:", { sessionId: newSession.id, userId: newSession.userId });
     } catch (error) {
       console.error("Failed to store user session:", error);
       // Temporarily throw the error to see what's happening
@@ -555,8 +546,6 @@ export class AuthService {
           CommonCacheConfigs.authSession()
         )
       );
-
-      console.log("SESSION DATA:", session);
 
       // Check if session exists and is not expired
       if (!session || session.expiresAt <= new Date()) {

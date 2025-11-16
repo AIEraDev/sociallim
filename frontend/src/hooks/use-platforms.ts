@@ -111,6 +111,7 @@ export function usePlatforms(enabled = false) {
     // Mutation states
     isConnecting: connectPlatformMutation.isPending,
     isDisconnecting: disconnectPlatformMutation.isPending,
+    // isConnectingTwitter: connectTwitterPlatformMutation.isPending,
 
     connectError: connectPlatformMutation.error ? handleQueryError(connectPlatformMutation.error) : null,
     disconnectError: disconnectPlatformMutation.error ? handleQueryError(disconnectPlatformMutation.error) : null,
