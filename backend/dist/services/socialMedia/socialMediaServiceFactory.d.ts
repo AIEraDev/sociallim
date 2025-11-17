@@ -1,8 +1,7 @@
 import { Platform } from "@prisma/client";
-import { ISocialMediaService } from "../../types/socialMedia";
 export declare class SocialMediaServiceFactory {
-    static getService(platform: Platform): ISocialMediaService;
-    static getAllServices(): ISocialMediaService[];
+    static getService(platform: Platform): import("./youtubeService").YouTubeService | import("./instagramService").InstagramService | import("./twitterService").TwitterService | import("./tiktokService").TikTokService | import("./facebookService").FacebookService;
+    static getAllServices(): (import("./youtubeService").YouTubeService | import("./instagramService").InstagramService | import("./twitterService").TwitterService | import("./tiktokService").TikTokService | import("./facebookService").FacebookService)[];
     static getSupportedPlatforms(): Platform[];
     static isPlatformSupported(platform: string): boolean;
 }

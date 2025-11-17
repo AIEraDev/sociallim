@@ -39,26 +39,52 @@ class TikTokService {
             return Promise.reject(error);
         });
     }
+    async fetchUserInfo(accessToken) {
+        try {
+            const response = await this.apiClient.post("/user/info/", {
+                fields: "open_id,union_id,avatar_url,display_name,bio_description,is_verified,profile_deep_link,follower_count,following_count,likes_count,video_count",
+            }, {
+                headers: {
+                    Authorization: `Bearer ${accessToken}`,
+                },
+            });
+            return response.data.data?.user || {};
+        }
+        catch (error) {
+            logger_1.logger.error("Error fetching TikTok user info:", error);
+            throw this.transformError(error);
+        }
+    }
     async fetchUserPosts(accessToken, options = {}) {
         try {
             const { limit = 20, pageToken } = options;
-            const params = {
-                fields: "id,title,video_description,create_time,cover_image_url,share_url,view_count,like_count,comment_count",
+            const queryParams = {
+                fields: "cover_image_url,id,title,create_time,video_description,duration,like_count,comment_count,view_count,share_count",
                 max_count: Math.min(limit, 20),
             };
             if (pageToken) {
-                params.cursor = pageToken;
+                queryParams.cursor = pageToken;
             }
-            const response = await this.apiClient.post("/video/list/", params, {
+            const requestBody = {
+                max_count: queryParams.max_count,
+            };
+            if (queryParams.cursor) {
+                requestBody.cursor = queryParams.cursor;
+            }
+            const response = await this.apiClient.post("/video/list/", requestBody, {
+                params: {
+                    fields: queryParams.fields,
+                },
                 headers: {
                     Authorization: `Bearer ${accessToken}`,
+                    "Content-Type": "application/json",
                 },
             });
             const videos = response.data.data?.videos || [];
             const posts = videos.map((video) => ({
                 id: video.id,
                 title: video.title || video.video_description || "TikTok Video",
-                url: video.share_url,
+                url: video.share_url || `https://www.tiktok.com/@user/video/${video.id}`,
                 publishedAt: new Date(video.create_time * 1000),
                 platform: client_1.Platform.TIKTOK,
                 thumbnailUrl: video.cover_image_url,
@@ -82,17 +108,28 @@ class TikTokService {
     async fetchPostComments(accessToken, postId, options = {}) {
         try {
             const { limit = 20, pageToken } = options;
-            const params = {
+            const queryParams = {
                 video_id: postId,
                 fields: "id,text,create_time,like_count,user",
                 max_count: Math.min(limit, 20),
             };
             if (pageToken) {
-                params.cursor = pageToken;
+                queryParams.cursor = pageToken;
             }
-            const response = await this.apiClient.post("/video/comment/list/", params, {
+            const requestBody = {
+                max_count: queryParams.max_count,
+            };
+            if (queryParams.cursor) {
+                requestBody.cursor = queryParams.cursor;
+            }
+            const response = await this.apiClient.post("/video/comment/list/", requestBody, {
+                params: {
+                    fields: queryParams.fields,
+                    video_id: queryParams.video_id,
+                },
                 headers: {
                     Authorization: `Bearer ${accessToken}`,
+                    "Content-Type": "application/json",
                 },
             });
             const tiktokComments = response.data.data?.comments || [];

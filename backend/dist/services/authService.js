@@ -55,7 +55,6 @@ class AuthService {
         const existingUser = await database_1.prisma.user.findUnique(withCacheStrategy({
             where: { email: email.toLowerCase() },
         }, (0, prismaCache_1.createEnvCacheStrategy)(300)));
-        console.log(existingUser);
         if (existingUser) {
             throw new Error("User with this email already exists");
         }
@@ -234,19 +233,18 @@ class AuthService {
     static async storeUserSession(userId, token) {
         try {
             const expiresAt = new Date(Date.now() + this.TOKEN_EXPIRATION_SECONDS * 1000);
-            await database_1.prisma.userSession.deleteMany({
-                where: { userId },
-            });
-            await database_1.prisma.userSession.create(withCacheStrategy({
+            await database_1.prisma.userSession.deleteMany({ where: { userId } });
+            await database_1.prisma.userSession.create({
                 data: {
                     token,
                     userId,
                     expiresAt,
                 },
-            }, (0, prismaCache_1.createEnvCacheStrategy)(this.TOKEN_EXPIRATION_SECONDS)));
+            });
         }
         catch (error) {
             console.error("Failed to store user session:", error);
+            throw error;
         }
     }
     static async storeLimitedUserSession(userId, token) {

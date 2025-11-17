@@ -21,8 +21,8 @@ export declare class DatabaseUtils {
             connectedAt: Date;
         }[];
     } & {
-        id: string;
         email: string;
+        id: string;
         password: string;
         firstName: string | null;
         lastName: string | null;
@@ -35,8 +35,8 @@ export declare class DatabaseUtils {
     }) | null>;
     static getPostWithDetails(postId: string): Promise<({
         user: {
-            id: string;
             email: string;
+            id: string;
             password: string;
             firstName: string | null;
             lastName: string | null;
@@ -112,8 +112,8 @@ export declare class DatabaseUtils {
     }) | null>;
     static getAnalysisWithDetails(analysisId: string): Promise<({
         user: {
-            id: string;
             email: string;
+            id: string;
             password: string;
             firstName: string | null;
             lastName: string | null;

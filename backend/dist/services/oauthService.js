@@ -4,10 +4,10 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.oauthService = exports.OAuthService = void 0;
-const prisma_1 = __importDefault(require("../config/prisma"));
-const encryption_1 = require("../utils/encryption");
 const client_1 = require("@prisma/client");
 const axios_1 = __importDefault(require("axios"));
+const prisma_1 = __importDefault(require("../config/prisma"));
+const encryption_1 = require("../utils/encryption");
 class OAuthService {
     async storeConnection(userId, tokenData) {
         try {
@@ -104,10 +104,18 @@ class OAuthService {
                     refreshResult = await this.refreshInstagramToken(connection.refreshToken);
                     break;
                 case client_1.Platform.TWITTER:
-                    return null;
+                    if (connection.refreshToken) {
+                        refreshResult = await this.refreshTwitterToken(connection.refreshToken);
+                    }
+                    else {
+                        return null;
+                    }
+                    break;
                 case client_1.Platform.TIKTOK:
                     refreshResult = await this.refreshTikTokToken(connection.refreshToken);
                     break;
+                case client_1.Platform.FACEBOOK:
+                    return null;
                 default:
                     throw new Error(`Token refresh not implemented for platform: ${platform}`);
             }
@@ -161,12 +169,34 @@ class OAuthService {
             expiresAt: new Date(Date.now() + expires_in * 1000),
         };
     }
+    async refreshTwitterToken(refreshToken) {
+        const response = await axios_1.default.post("https://api.twitter.com/2/oauth2/token", new URLSearchParams({
+            refresh_token: refreshToken,
+            grant_type: "refresh_token",
+            client_id: process.env.TWITTER_CLIENT_ID,
+        }), {
+            headers: {
+                "Content-Type": "application/x-www-form-urlencoded",
+                Authorization: `Basic ${Buffer.from(`${process.env.TWITTER_CLIENT_ID}:${process.env.TWITTER_CLIENT_SECRET}`).toString("base64")}`,
+            },
+        });
+        const { access_token, refresh_token, expires_in } = response.data;
+        return {
+            accessToken: access_token,
+            refreshToken: refresh_token || refreshToken,
+            expiresAt: expires_in ? new Date(Date.now() + expires_in * 1000) : undefined,
+        };
+    }
     async refreshTikTokToken(refreshToken) {
-        const response = await axios_1.default.post("https://open-api.tiktok.com/oauth/refresh_token/", {
+        const response = await axios_1.default.post("https://open.tiktokapis.com/v2/oauth/token/", new URLSearchParams({
             client_key: process.env.TIKTOK_CLIENT_ID,
             client_secret: process.env.TIKTOK_CLIENT_SECRET,
             refresh_token: refreshToken,
             grant_type: "refresh_token",
+        }), {
+            headers: {
+                "Content-Type": "application/x-www-form-urlencoded",
+            },
         });
         const { access_token, refresh_token, expires_in } = response.data;
         return {
@@ -193,6 +223,8 @@ class OAuthService {
                     return await this.validateTwitterToken(connection.accessToken);
                 case client_1.Platform.TIKTOK:
                     return await this.validateTikTokToken(connection.accessToken);
+                case client_1.Platform.FACEBOOK:
+                    return await this.validateFacebookToken(connection.accessToken);
                 default:
                     return false;
             }
@@ -248,10 +280,29 @@ class OAuthService {
     }
     async validateTikTokToken(accessToken) {
         try {
-            const response = await axios_1.default.post("https://open-api.tiktok.com/oauth/userinfo/", {
-                access_token: accessToken,
+            const response = await axios_1.default.post("https://open.tiktokapis.com/v2/user/info/", {
+                fields: "open_id,union_id,avatar_url,display_name,bio_description,is_verified,profile_deep_link,follower_count,following_count,likes_count,video_count",
+            }, {
+                headers: {
+                    Authorization: `Bearer ${accessToken}`,
+                    "Content-Type": "application/json",
+                },
             });
-            return response.status === 200;
+            return response.status === 200 && !!response.data.data?.user?.open_id;
+        }
+        catch (error) {
+            return false;
+        }
+    }
+    async validateFacebookToken(accessToken) {
+        try {
+            const response = await axios_1.default.get("https://graph.facebook.com/v18.0/me", {
+                params: {
+                    fields: "id",
+                    access_token: accessToken,
+                },
+            });
+            return response.status === 200 && !!response.data.id;
         }
         catch (error) {
             return false;

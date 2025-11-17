@@ -2,6 +2,7 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.EmailProviderFactory = void 0;
 const environment_1 = require("../../config/environment");
+const nodemailerProvider_1 = require("./providers/nodemailerProvider");
 const resendProvider_1 = require("./providers/resendProvider");
 const mailtrapProvider_1 = require("./providers/mailtrapProvider");
 const consoleProvider_1 = require("./providers/consoleProvider");
@@ -9,6 +10,12 @@ class EmailProviderFactory {
     static createProvider() {
         const provider = environment_1.config.email.provider;
         switch (provider) {
+            case "nodemailer":
+                if (!environment_1.config.email.nodemailer.host || !environment_1.config.email.nodemailer.auth.user || !environment_1.config.email.nodemailer.auth.pass) {
+                    console.warn("Nodemailer SMTP credentials not configured, falling back to console provider");
+                    return new consoleProvider_1.ConsoleProvider();
+                }
+                return new nodemailerProvider_1.NodemailerProvider(environment_1.config.email.nodemailer);
             case "resend":
                 if (!environment_1.config.email.resend.apiKey) {
                     console.warn("Resend API key not configured, falling back to console provider");

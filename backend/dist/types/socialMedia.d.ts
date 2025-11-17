@@ -110,14 +110,14 @@ export interface TwitterReply {
 }
 export interface TikTokVideo {
     id: string;
-    title: string;
-    video_description: string;
+    title?: string;
+    video_description?: string;
     create_time: number;
-    cover_image_url: string;
-    share_url: string;
-    view_count: number;
-    like_count: number;
-    comment_count: number;
+    cover_image_url?: string;
+    share_url?: string;
+    view_count?: number;
+    like_count?: number;
+    comment_count?: number;
 }
 export interface TikTokComment {
     id: string;

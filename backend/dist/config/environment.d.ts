@@ -41,6 +41,15 @@ export declare const config: {
     email: {
         provider: any;
         fromEmail: any;
+        nodemailer: {
+            host: any;
+            port: any;
+            secure: any;
+            auth: {
+                user: any;
+                pass: any;
+            };
+        };
         resend: {
             apiKey: any;
         };

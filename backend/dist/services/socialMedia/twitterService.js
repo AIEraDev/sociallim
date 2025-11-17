@@ -12,11 +12,19 @@ class TwitterService {
     constructor() {
         this.platform = client_1.Platform.TWITTER;
         this.baseUrl = "https://api.twitter.com/2";
+        this.authUrl = "https://twitter.com/i/oauth2/authorize";
+        this.tokenUrl = "https://api.twitter.com/2/oauth2/token";
         this.rateLimitInfo = {
             remaining: 300,
             resetTime: new Date(Date.now() + 15 * 60 * 1000),
             limit: 300,
         };
+        this.clientId = process.env.TWITTER_CLIENT_ID;
+        this.clientSecret = process.env.TWITTER_CLIENT_SECRET;
+        this.callbackUrl = process.env.TWITTER_CALLBACK_URL || `${process.env.BACKEND_URL}/api/oauth/callback/twitter`;
+        if (!this.clientId || !this.clientSecret) {
+            throw new Error("Twitter OAuth 2.0 credentials are required: TWITTER_CLIENT_ID and TWITTER_CLIENT_SECRET");
+        }
         this.apiClient = axios_1.default.create({
             baseURL: this.baseUrl,
             timeout: 30000,
@@ -45,133 +53,118 @@ class TwitterService {
             return Promise.reject(error);
         });
     }
-    async fetchUserPosts(accessToken, options = {}) {
-        try {
-            const { limit = 100, pageToken, maxResults = 100 } = options;
-            const userResponse = await this.apiClient.get("/users/me", {
-                headers: {
-                    Authorization: `Bearer ${accessToken}`,
-                },
-            });
-            const userId = userResponse.data.data.id;
-            const params = {
-                "tweet.fields": "created_at,public_metrics,text",
-                "user.fields": "id,name,username",
-                max_results: Math.min(limit, maxResults, 100),
-                exclude: "retweets,replies",
-            };
-            if (pageToken) {
-                params.pagination_token = pageToken;
-            }
-            const response = await this.apiClient.get(`/users/${userId}/tweets`, {
-                params,
-                headers: {
-                    Authorization: `Bearer ${accessToken}`,
-                },
-            });
-            const tweets = response.data.data || [];
-            const posts = tweets.map((tweet) => ({
-                id: tweet.id,
-                title: tweet.text.length > 50 ? `${tweet.text.substring(0, 47)}...` : tweet.text,
-                url: `https://twitter.com/user/status/${tweet.id}`,
-                publishedAt: new Date(tweet.created_at),
-                platform: client_1.Platform.TWITTER,
-                description: tweet.text,
-                viewCount: tweet.public_metrics?.quote_count,
-                likeCount: tweet.public_metrics?.like_count,
-            }));
-            const pagination = {
-                nextPageToken: response.data.meta?.next_token,
-                totalResults: response.data.meta?.result_count,
-                resultsPerPage: tweets.length,
-            };
-            logger_1.logger.info(`Fetched ${posts.length} Twitter posts for user`);
-            return { posts, pagination };
-        }
-        catch (error) {
-            logger_1.logger.error("Error fetching Twitter posts:", error);
-            throw this.transformError(error);
-        }
+    generateAuthUrl(codeChallenge, state) {
+        const params = new URLSearchParams({
+            response_type: "code",
+            client_id: this.clientId,
+            redirect_uri: this.callbackUrl,
+            scope: "tweet.read users.read follows.read offline.access",
+            state: state,
+            code_challenge: codeChallenge,
+            code_challenge_method: "S256",
+        });
+        return `${this.authUrl}?${params.toString()}`;
     }
-    async fetchPostComments(accessToken, postId, options = {}) {
+    async exchangeCodeForToken(code, codeVerifier) {
+        const params = new URLSearchParams({
+            grant_type: "authorization_code",
+            code: code,
+            redirect_uri: this.callbackUrl,
+            code_verifier: codeVerifier,
+            client_id: this.clientId,
+        });
+        const credentials = Buffer.from(`${this.clientId}:${this.clientSecret}`).toString("base64");
+        const response = await axios_1.default.post(this.tokenUrl, params.toString(), {
+            headers: {
+                "Content-Type": "application/x-www-form-urlencoded",
+                Authorization: `Basic ${credentials}`,
+            },
+        });
+        return response.data;
+    }
+    async fetchUserInfo(accessToken) {
         try {
-            const { limit = 100, pageToken, maxResults = 100 } = options;
-            const params = {
-                query: `conversation_id:${postId}`,
-                "tweet.fields": "created_at,public_metrics,text,author_id,in_reply_to_user_id",
-                "user.fields": "id,name,username",
-                expansions: "author_id",
-                max_results: Math.min(limit, maxResults, 100),
-            };
-            if (pageToken) {
-                params.next_token = pageToken;
-            }
-            const response = await this.apiClient.get("/tweets/search/recent", {
-                params,
+            console.log("Making Twitter API request with OAuth 2.0 User Context");
+            const response = await this.apiClient.get("/users/me", {
+                params: {
+                    "user.fields": "id,name,username,description,public_metrics,profile_image_url,verified",
+                },
                 headers: {
                     Authorization: `Bearer ${accessToken}`,
+                    "Content-Type": "application/json",
                 },
             });
-            const replies = response.data.data || [];
-            const users = response.data.includes?.users || [];
-            const userMap = new Map(users.map((user) => [user.id, user.username]));
-            const comments = replies
-                .filter((reply) => reply.id !== postId)
-                .map((reply) => ({
-                id: reply.id,
-                text: reply.text,
-                authorName: userMap.get(reply.author_id) || `User ${reply.author_id}`,
-                publishedAt: new Date(reply.created_at),
-                likeCount: reply.public_metrics?.like_count || 0,
-                replyCount: reply.public_metrics?.reply_count,
-            }));
-            const pagination = {
-                nextPageToken: response.data.meta?.next_token,
-                totalResults: response.data.meta?.result_count,
-                resultsPerPage: comments.length,
+            const user = response.data.data;
+            return {
+                id: user.id,
+                name: user.name,
+                username: user.username,
+                description: user.description,
+                profileImageUrl: user.profile_image_url,
+                verified: user.verified,
+                followersCount: user.public_metrics?.followers_count,
+                followingCount: user.public_metrics?.following_count,
+                tweetCount: user.public_metrics?.tweet_count,
+                listedCount: user.public_metrics?.listed_count,
             };
-            logger_1.logger.info(`Fetched ${comments.length} replies for Twitter post ${postId}`);
-            return { comments, pagination };
         }
         catch (error) {
-            logger_1.logger.error(`Error fetching Twitter replies for post ${postId}:`, error);
+            logger_1.logger.error("Error fetching Twitter user info:", error);
             throw this.transformError(error);
         }
     }
     async validateToken(accessToken) {
         try {
+            console.log("TwitterService: Validating OAuth 2.0 User Access Token...");
             const response = await this.apiClient.get("/users/me", {
+                params: {
+                    "user.fields": "id",
+                },
                 headers: {
                     Authorization: `Bearer ${accessToken}`,
+                    "Content-Type": "application/json",
                 },
+            });
+            console.log("Twitter API response:", {
+                status: response.status,
+                hasData: !!response.data,
+                hasUserId: !!response.data?.data?.id,
             });
             return response.status === 200 && !!response.data.data?.id;
         }
         catch (error) {
+            console.error("Twitter token validation failed:", {
+                message: error.message,
+                status: error.response?.status,
+                data: error.response?.data,
+            });
             logger_1.logger.warn("Twitter token validation failed:", error);
             return false;
         }
     }
+    async refreshAccessToken(refreshToken) {
+        const params = new URLSearchParams({
+            grant_type: "refresh_token",
+            refresh_token: refreshToken,
+            client_id: this.clientId,
+        });
+        const credentials = Buffer.from(`${this.clientId}:${this.clientSecret}`).toString("base64");
+        const response = await axios_1.default.post(this.tokenUrl, params.toString(), {
+            headers: {
+                "Content-Type": "application/x-www-form-urlencoded",
+                Authorization: `Basic ${credentials}`,
+            },
+        });
+        return response.data;
+    }
+    async fetchUserPosts(accessToken, options = {}) {
+        return { posts: [] };
+    }
+    async fetchPostComments(accessToken, postId, options = {}) {
+        return { comments: [] };
+    }
     async getRateLimitInfo(accessToken) {
-        try {
-            const response = await this.apiClient.get("/users/me", {
-                headers: {
-                    Authorization: `Bearer ${accessToken}`,
-                },
-            });
-            const remaining = response.headers["x-rate-limit-remaining"];
-            const resetTime = response.headers["x-rate-limit-reset"];
-            if (remaining) {
-                this.rateLimitInfo.remaining = parseInt(remaining);
-            }
-            if (resetTime) {
-                this.rateLimitInfo.resetTime = new Date(parseInt(resetTime) * 1000);
-            }
-            return { ...this.rateLimitInfo };
-        }
-        catch (error) {
-            return { ...this.rateLimitInfo };
-        }
+        return { ...this.rateLimitInfo };
     }
     handleApiError(error) {
         const status = error.response?.status;

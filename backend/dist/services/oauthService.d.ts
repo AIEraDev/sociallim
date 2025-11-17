@@ -34,12 +34,14 @@ export declare class OAuthService {
     refreshToken(userId: string, platform: Platform): Promise<TokenRefreshResult | null>;
     private refreshGoogleToken;
     private refreshInstagramToken;
+    private refreshTwitterToken;
     private refreshTikTokToken;
     validateToken(userId: string, platform: Platform): Promise<boolean>;
     private validateYouTubeToken;
     private validateInstagramToken;
     private validateTwitterToken;
     private validateTikTokToken;
+    private validateFacebookToken;
     disconnectPlatform(userId: string, platform: Platform): Promise<void>;
 }
 export declare const oauthService: OAuthService;

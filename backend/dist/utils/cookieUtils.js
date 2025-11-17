@@ -5,10 +5,11 @@ const environment_1 = require("../config/environment");
 class CookieUtils {
     static getDefaultOptions() {
         const isProduction = environment_1.config.env === "production";
+        console.log("NODE ENVIRONMENT: ", isProduction);
         return {
             httpOnly: true,
             secure: isProduction,
-            sameSite: isProduction ? "strict" : "lax",
+            sameSite: isProduction ? "none" : "lax",
             path: "/",
         };
     }

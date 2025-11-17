@@ -6,6 +6,7 @@ const youtubeService_1 = require("./youtubeService");
 const instagramService_1 = require("./instagramService");
 const twitterService_1 = require("./twitterService");
 const tiktokService_1 = require("./tiktokService");
+const facebookService_1 = require("./facebookService");
 class SocialMediaServiceFactory {
     static getService(platform) {
         switch (platform) {
@@ -17,15 +18,17 @@ class SocialMediaServiceFactory {
                 return twitterService_1.twitterService.instance;
             case client_1.Platform.TIKTOK:
                 return tiktokService_1.tiktokService.instance;
+            case client_1.Platform.FACEBOOK:
+                return facebookService_1.facebookService.instance;
             default:
                 throw new Error(`Unsupported platform: ${platform}`);
         }
     }
     static getAllServices() {
-        return [youtubeService_1.youtubeService.instance, instagramService_1.instagramService.instance, twitterService_1.twitterService.instance, tiktokService_1.tiktokService.instance];
+        return [youtubeService_1.youtubeService.instance, instagramService_1.instagramService.instance, twitterService_1.twitterService.instance, tiktokService_1.tiktokService.instance, facebookService_1.facebookService.instance];
     }
     static getSupportedPlatforms() {
-        return [client_1.Platform.YOUTUBE, client_1.Platform.INSTAGRAM, client_1.Platform.TWITTER, client_1.Platform.TIKTOK];
+        return [client_1.Platform.YOUTUBE, client_1.Platform.INSTAGRAM, client_1.Platform.TWITTER, client_1.Platform.TIKTOK, client_1.Platform.FACEBOOK];
     }
     static isPlatformSupported(platform) {
         return Object.values(client_1.Platform).includes(platform);

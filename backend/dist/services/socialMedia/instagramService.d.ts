@@ -5,6 +5,7 @@ export declare class InstagramService implements ISocialMediaService {
     private readonly baseUrl;
     private rateLimitInfo;
     constructor();
+    fetchUserInfo(accessToken: string): Promise<any>;
     fetchUserPosts(accessToken: string, options?: FetchPostsOptions): Promise<{
         posts: SocialMediaPost[];
         pagination?: PaginationInfo;

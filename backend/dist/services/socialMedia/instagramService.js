@@ -38,6 +38,26 @@ class InstagramService {
             return Promise.reject(error);
         });
     }
+    async fetchUserInfo(accessToken) {
+        try {
+            const response = await this.apiClient.get("/me", {
+                params: {
+                    fields: "id,username,account_type,media_count",
+                    access_token: accessToken,
+                },
+            });
+            return {
+                id: response.data.id,
+                username: response.data.username,
+                accountType: response.data.account_type,
+                mediaCount: response.data.media_count,
+            };
+        }
+        catch (error) {
+            logger_1.logger.error("Error fetching Instagram user info:", error);
+            throw this.transformError(error);
+        }
+    }
     async fetchUserPosts(accessToken, options = {}) {
         try {
             const { limit = 25, pageToken } = options;

@@ -41,6 +41,36 @@ class YouTubeService {
             return Promise.reject(error);
         });
     }
+    async fetchUserInfo(accessToken) {
+        try {
+            const response = await this.apiClient.get("/channels", {
+                params: {
+                    part: "snippet,statistics",
+                    mine: true,
+                },
+                headers: {
+                    Authorization: `Bearer ${accessToken}`,
+                },
+            });
+            const channel = response.data.items?.[0];
+            if (!channel) {
+                throw new Error("No channel found for user");
+            }
+            return {
+                id: channel.id,
+                title: channel.snippet?.title,
+                description: channel.snippet?.description,
+                thumbnailUrl: channel.snippet?.thumbnails?.default?.url,
+                subscriberCount: channel.statistics?.subscriberCount,
+                videoCount: channel.statistics?.videoCount,
+                viewCount: channel.statistics?.viewCount,
+            };
+        }
+        catch (error) {
+            logger_1.logger.error("Error fetching YouTube user info:", error);
+            throw this.transformError(error);
+        }
+    }
     async fetchUserPosts(accessToken, options = {}) {
         try {
             const { limit = 50, pageToken, maxResults = 50 } = options;
