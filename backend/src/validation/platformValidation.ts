@@ -1,6 +1,23 @@
 import Joi from "joi";
 import { Platform } from "@prisma/client";
 
+/*** Validation schemas ***/
+export const platformParamSchema = Joi.object({
+  platform: Joi.string()
+    .valid(...Object.values(Platform).map((p) => p.toLowerCase()))
+    .required()
+    .messages({
+      "any.only": "Platform must be one of: youtube, instagram, twitter, tiktok",
+      "any.required": "Platform parameter is required",
+    }),
+});
+
+export const startAnalysisSchema = Joi.object({
+  postId: Joi.string().required().messages({
+    "any.required": "Post ID is required",
+  }),
+});
+
 /**
  * Validation schema for platform connection
  */

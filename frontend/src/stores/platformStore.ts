@@ -1,7 +1,7 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 
-export type Platform = "youtube" | "instagram" | "twitter" | "tiktok";
+export type Platform = "meta" | "twitter" | "tiktok";
 
 interface PlatformState {
   selectedPlatform: Platform;

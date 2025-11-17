@@ -1,10 +1,7 @@
 import { Platform } from "@prisma/client";
-// import { ISocialMediaService } from "../../types/socialMedia";
-import { youtubeService } from "./youtubeService";
-import { instagramService } from "./instagramService";
 import { twitterService } from "./twitterService";
 import { tiktokService } from "./tiktokService";
-import { facebookService } from "./facebookService";
+import { metaService } from "./metaService";
 
 /**
  * Factory class to get the appropriate social media service based on platform
@@ -15,16 +12,14 @@ export class SocialMediaServiceFactory {
    */
   static getService(platform: Platform) {
     switch (platform) {
-      case Platform.YOUTUBE:
-        return youtubeService.instance;
       case Platform.INSTAGRAM:
-        return instagramService.instance;
+      case Platform.FACEBOOK:
+        // Both Instagram and Facebook use the Meta service
+        return metaService.instance;
       case Platform.TWITTER:
         return twitterService.instance;
       case Platform.TIKTOK:
         return tiktokService.instance;
-      case Platform.FACEBOOK:
-        return facebookService.instance;
       default:
         throw new Error(`Unsupported platform: ${platform}`);
     }
@@ -34,14 +29,14 @@ export class SocialMediaServiceFactory {
    * Get all available social media services
    */
   static getAllServices() {
-    return [youtubeService.instance, instagramService.instance, twitterService.instance, tiktokService.instance, facebookService.instance];
+    return [metaService.instance, twitterService.instance, tiktokService.instance];
   }
 
   /**
    * Get all supported platforms
    */
   static getSupportedPlatforms(): Platform[] {
-    return [Platform.YOUTUBE, Platform.INSTAGRAM, Platform.TWITTER, Platform.TIKTOK, Platform.FACEBOOK];
+    return [Platform.FACEBOOK, Platform.INSTAGRAM, Platform.TWITTER, Platform.TIKTOK];
   }
 
   /**

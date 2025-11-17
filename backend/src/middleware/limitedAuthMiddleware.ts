@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from "express";
 import jwt from "jsonwebtoken";
+
 import { config } from "../config/environment";
 import { AuthService } from "../services/authService";
 import { CookieUtils } from "../utils/cookieUtils";
@@ -20,11 +21,7 @@ declare global {
   }
 }
 
-/**
- * Middleware to authenticate limited access tokens
- *
- * Allows unverified users to access certain endpoints with restricted permissions
- */
+/*** Middleware to authenticate limited access tokens - Allows unverified users to access certain endpoints with restricted permissions ***/
 export const authenticateLimitedToken = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
     // Try to get token from cookie first, then fallback to Authorization header
@@ -84,34 +81,7 @@ export const authenticateLimitedToken = async (req: Request, res: Response, next
   }
 };
 
-/**
- * Middleware to check if user has specific permission
- */
-export const requirePermission = (permission: string) => {
-  return (req: Request, res: Response, next: NextFunction): void => {
-    if (!req.limitedUser) {
-      res.status(401).json({
-        error: "Unauthorized",
-        message: "Authentication required",
-      });
-      return;
-    }
-
-    if (!req.limitedUser.scope.includes(permission)) {
-      res.status(403).json({
-        error: "Forbidden",
-        message: `Permission '${permission}' required`,
-      });
-      return;
-    }
-
-    next();
-  };
-};
-
-/**
- * Combined middleware that accepts both full and limited tokens
- */
+/*** Combined middleware that accepts both full and limited tokens ***/
 export const authenticateAnyToken = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
     // Try to get token from cookie first, then fallback to Authorization header

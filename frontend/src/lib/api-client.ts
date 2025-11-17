@@ -36,6 +36,40 @@ export interface TwitterCallbackResponse {
   };
 }
 
+export interface FacebookAuthResponse {
+  success: boolean;
+  authUrl: string;
+  state: string;
+}
+
+export interface FacebookCallbackResponse {
+  success: boolean;
+  message: string;
+  data: {
+    facebook: {
+      id: string;
+      name: string;
+      email?: string;
+      picture?: string;
+      pages: Array<{
+        id: string;
+        name: string;
+        category: string;
+      }>;
+    };
+    instagram: Array<{
+      id: string;
+      username: string;
+      name?: string;
+      profilePictureUrl?: string;
+      followersCount?: number;
+      followingCount?: number;
+      mediaCount?: number;
+      connectedPageName: string;
+    }>;
+  };
+}
+
 class ApiClient {
   private baseURL: string;
   private token: string | null = null;
@@ -262,28 +296,13 @@ class ApiClient {
     return response;
   }
 
-  async resendEmailVerification(email: string): Promise<ApiResponse<{ message: string }>> {
-    return this.request<{ message: string }>("/auth/resend-verification", {
-      method: "POST",
-      body: JSON.stringify({ email }),
-    });
-  }
-
   // Platform connection endpoints
   async getConnectedPlatforms(): Promise<ApiResponse<ConnectedPlatform[]>> {
     return this.request<ConnectedPlatform[]>("/platforms");
   }
 
-  async connectPlatform(platform: Platform) {
-    return await fetch(`${this.baseURL}/oauth/connect/${platform.toLowerCase()}`, {
-      credentials: "include",
-    });
-  }
-
   async disconnectPlatform(platform: Platform): Promise<ApiResponse<void>> {
-    return this.request<void>(`/platforms/disconnect/${platform.toLowerCase()}`, {
-      method: "DELETE",
-    });
+    return this.request<void>(`/platforms/disconnect/${platform.toLowerCase()}`, { method: "DELETE" });
   }
 
   // Get Twitter authorization URL
@@ -301,10 +320,37 @@ class ApiClient {
     });
   }
 
-  // Disconnect Twitter account
-  async disconnectTwitter(): Promise<ApiResponse<void>> {
-    return this.request<void>("/oauth/twitter/disconnect", { method: "DELETE" });
+  /**
+   *
+   *
+   *
+   *
+   *
+   *
+   *
+   */
+  async getFacebookAuthUrl(): Promise<FacebookAuthResponse> {
+    const response = this.request<FacebookAuthResponse>("/oauth/meta/authorize");
+    return (await response).data!;
   }
+
+  async completeFacebookAuth(code: string, state: string): Promise<ApiResponse<FacebookCallbackResponse>> {
+    return this.request<FacebookCallbackResponse>("/oauth/meta/callback", {
+      method: "POST",
+      body: JSON.stringify({ code, state }),
+      credentials: "include",
+    });
+  }
+
+  /**
+   *
+   *
+   *
+   *
+   *
+   *
+   *
+   */
 
   // Posts endpoints
   async getUserPlatformPosts(platform?: Platform, source: string = "live", limit: number = 5): Promise<PostsInterface> {

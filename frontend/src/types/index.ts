@@ -5,7 +5,6 @@
 
 // Platform and Sentiment enums matching backend
 export enum Platform {
-  YOUTUBE = "YOUTUBE",
   INSTAGRAM = "INSTAGRAM",
   TWITTER = "TWITTER",
   TIKTOK = "TIKTOK",

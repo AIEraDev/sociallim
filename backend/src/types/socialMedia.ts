@@ -174,3 +174,25 @@ export class ApiError extends Error implements ApiErrorData {
     }
   }
 }
+
+// Social Media Service Interface
+export interface ISocialMediaService {
+  platform: Platform;
+  fetchUserPosts(
+    accessToken: string,
+    options?: FetchPostsOptions
+  ): Promise<{
+    posts: SocialMediaPost[];
+    pagination?: PaginationInfo;
+  }>;
+  fetchPostComments(
+    accessToken: string,
+    postId: string,
+    options?: FetchCommentsOptions
+  ): Promise<{
+    comments: SocialMediaComment[];
+    pagination?: PaginationInfo;
+  }>;
+  validateToken(accessToken: string): Promise<boolean>;
+  getRateLimitInfo(accessToken: string): Promise<RateLimitInfo>;
+}

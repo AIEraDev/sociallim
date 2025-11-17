@@ -219,7 +219,6 @@ model Keyword {
 }
 
 enum Platform {
-  YOUTUBE
   INSTAGRAM
   TWITTER
   TIKTOK

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { X, CheckCircle, ExternalLink, Loader2, Facebook, Instagram } from "lucide-react";
+import { X, CheckCircle, ExternalLink, Loader2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -12,6 +12,9 @@ import { usePlatforms } from "@/hooks/use-platforms";
 import { Platform } from "@/types";
 import { LoadingSingleCard } from "../ui/loading";
 import { useTwitterAuth } from "@/hooks/useTwitterAuth";
+import { useMetaAuth } from "@/hooks/useMetaAuth";
+import { apiClient } from "@/lib/api-client";
+import { FaMeta } from "react-icons/fa6";
 
 interface ConnectSocialModalProps {
   open: boolean;
@@ -32,17 +35,6 @@ interface SocialPlatform {
 }
 
 const socialPlatforms: SocialPlatform[] = [
-  // {
-  //   id: "youtube",
-  //   name: "YouTube",
-  //   icon: Youtube,
-  //   color: "text-red-400",
-  //   bgColor: "bg-red-500/10 border-red-500/20",
-  //   description: "Analyze comments from your YouTube videos and live streams",
-  //   features: ["Video comments", "Live chat", "Community posts", "Shorts comments"],
-  //   connected: false,
-  // },
-
   {
     id: "tiktok",
     name: "TikTok",
@@ -64,23 +56,13 @@ const socialPlatforms: SocialPlatform[] = [
     connected: false,
   },
   {
-    id: "instagram",
-    name: "Instagram",
-    icon: Instagram,
-    color: "text-pink-400",
-    bgColor: "bg-pink-500/10 border-pink-500/20",
-    description: "Monitor engagement on posts, stories, and reels",
-    features: ["Post comments", "Story replies", "Reel comments", "DM insights"],
-    connected: false,
-  },
-  {
-    id: "facebook",
-    name: "Facebook",
-    icon: Facebook,
+    id: "meta",
+    name: "Meta",
+    icon: FaMeta,
     color: "text-blue-500",
     bgColor: "bg-blue-500/10 border-blue-500/20",
-    description: "Analyze engagement on Facebook posts and pages",
-    features: ["Page posts", "Post comments", "Page insights", "Reactions"],
+    description: "Analyze engagement on Facebook and Instagram posts",
+    features: ["Facebook posts", "Instagram posts", "Page insights", "Story engagement"],
     connected: false,
   },
 ];
@@ -190,26 +172,18 @@ interface PlatformConnectItem {
 function PlatformConnectItem({ platform, isConnected, isConnecting }: PlatformConnectItem) {
   const { disconnectPlatform, connectPlatform, isLoading: loadingConnectedPlatforms } = usePlatforms();
   const { isConnectingTwitter, connectTwitter } = useTwitterAuth();
+  const { isConnectingMeta, connectMeta } = useMetaAuth();
 
   // Handle social media connections using NextAuth
   const handleConnect = async (platformId: string) => {
     if (socialPlatforms.find((p) => p.id === platformId)?.comingSoon) return;
 
     switch (platformId) {
-      case "facebook":
-      case "instagram": // Instagram uses Facebook auth
-        // await connectFacebook();
+      case "meta": // Meta handles both Facebook and Instagram
+        connectMeta();
         break;
       case "twitter":
         connectTwitter();
-        // const status = await connectTwitter();
-        // // If auth is successful, sync with backend
-        // if (status) {
-        //   // Wait a moment for the session to update, then sync
-        //   setTimeout(async () => {
-        //     await syncTwitterWithBackend();
-        //   }, 2000);
-        // }
         break;
       default:
         // For other platforms, use the existing API
@@ -221,12 +195,20 @@ function PlatformConnectItem({ platform, isConnected, isConnecting }: PlatformCo
   const handleDisconnect = async (platformId: string) => {
     if (socialPlatforms.find((p) => p.id === platformId)?.comingSoon) return;
 
-    // For social auth platforms, use NextAuth disconnect
-    if (["facebook", "instagram", "twitter"].includes(platformId)) {
-      // await disconnectAccount();
-    } else {
-      // For other platforms, use the existing API
-      disconnectPlatform(platformId as Platform);
+    // For social auth platforms, use specific disconnect methods
+    switch (platformId) {
+      case "meta":
+        // Use Meta disconnect API (handles both Facebook and Instagram)
+        await apiClient.disconnectMeta();
+        break;
+      case "twitter":
+        // Use Twitter disconnect API
+        await apiClient.disconnectTwitter();
+        break;
+      default:
+        // For other platforms, use the existing API
+        disconnectPlatform(platformId as Platform);
+        break;
     }
   };
 
@@ -279,7 +261,7 @@ function PlatformConnectItem({ platform, isConnected, isConnecting }: PlatformCo
             </>
           ) : (
             <Button size="sm" className={`flex-1 ${platform.comingSoon ? "bg-gray-600 hover:bg-gray-600 cursor-not-allowed" : "bg-blue-600 hover:bg-blue-700"}`} onClick={() => handleConnect(platform.id)} disabled={loadingConnectedPlatforms || isConnecting || platform.comingSoon}>
-              {isConnecting || isConnectingTwitter ? (
+              {isConnecting || isConnectingTwitter || isConnectingMeta ? (
                 <>
                   <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                   Connecting...

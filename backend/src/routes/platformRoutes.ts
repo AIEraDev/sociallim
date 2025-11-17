@@ -1,58 +1,13 @@
 import { Router, Request, Response } from "express";
+import { Platform } from "@prisma/client";
+
 import { authenticateToken } from "../middleware/authMiddleware";
 import { oauthService } from "../services/oauthService";
 import { socialMediaServiceFactory } from "../services/socialMedia/socialMediaServiceFactory";
-import { analysisOrchestrationService, jobManager } from "../services";
-import { Platform } from "@prisma/client";
 import { prisma } from "../config/database";
-import Joi from "joi";
+import { fetchPostsSchema, platformParamSchema } from "../validation/platformValidation";
 
 const router = Router();
-
-/**
- * Validation schemas
- */
-const platformParamSchema = Joi.object({
-  platform: Joi.string()
-    .valid(...Object.values(Platform).map((p) => p.toLowerCase()))
-    .required()
-    .messages({
-      "any.only": "Platform must be one of: youtube, instagram, twitter, tiktok",
-      "any.required": "Platform parameter is required",
-    }),
-});
-
-const fetchPostsSchema = Joi.object({
-  limit: Joi.number().integer().min(1).max(50).default(20).messages({
-    "number.min": "Limit must be at least 1",
-    "number.max": "Limit cannot exceed 50",
-  }),
-  pageToken: Joi.string().optional(),
-  source: Joi.string().valid("db", "live").default("db").messages({
-    "any.only": "Source must be 'db' (database) or 'live' (fetch fresh from social platform).",
-  }),
-});
-
-const startAnalysisSchema = Joi.object({
-  postId: Joi.string().required().messages({
-    "any.required": "Post ID is required",
-  }),
-});
-
-/**
- * Middleware to validate platform parameter
- */
-const validatePlatform = (req: Request, res: Response, next: any): void => {
-  const { error } = platformParamSchema.validate(req.params);
-  if (error) {
-    res.status(400).json({
-      error: "Invalid platform",
-      message: error.details[0].message,
-    });
-    return;
-  }
-  next();
-};
 
 /**
  * GET /platforms/
@@ -82,6 +37,27 @@ router.get("/", authenticateToken, async (req: Request, res: Response): Promise<
       error: "Internal server error",
       message: "An error occurred while fetching connected platforms",
     });
+  }
+});
+
+/*** Disconnect a platform ***/
+router.delete("/disconnect/:platform", authenticateToken, async (req: Request, res: Response) => {
+  try {
+    const { platform } = req.params;
+    const userId = (req as any).user.id;
+
+    // Validate platform parameter
+    if (!Object.values(Platform).includes(platform.toUpperCase() as Platform)) {
+      return res.status(400).json({ error: "Invalid platform" });
+    }
+
+    const platformEnum = platform.toUpperCase() as Platform;
+    await oauthService.disconnectPlatform(userId, platformEnum);
+
+    return res.json({ platform, disconnected: true });
+  } catch (error) {
+    console.error("Error disconnecting platform:", error);
+    return res.status(500).json({ error: "Failed to disconnect platform" });
   }
 });
 
@@ -283,203 +259,6 @@ router.get("/:platform/posts", authenticateToken, async (req: Request, res: Resp
     res.status(500).json({
       error: "Failed to fetch posts",
       message: `An error occurred while fetching posts from ${req.params.platform}`,
-    });
-  }
-});
-
-/**
- * GET /platforms/posts
- * Fetch user posts from all connected platforms (legacy endpoint)
- */
-// router.get("/posts", authenticateToken, async (req: Request, res: Response): Promise<void> => {
-//   try {
-//     if (!req.user) {
-//       res.status(401).json({
-//         error: "Unauthorized",
-//         message: "User not authenticated",
-//       });
-//       return;
-//     }
-
-//     const { error, value } = fetchPostsSchema.validate(req.query);
-//     if (error) {
-//       res.status(400).json({
-//         error: "Invalid query parameters",
-//         message: error.details[0].message,
-//       });
-//       return;
-//     }
-
-//     const { limit, source } = value;
-//     const userId = req.user.id;
-
-//     if (source === "db") {
-//       // Fetch from database for all platforms
-//       const posts = await prisma.post.findMany({
-//         where: { userId },
-//         orderBy: { publishedAt: "desc" },
-//         take: limit,
-//         include: {
-//           _count: {
-//             select: { comments: true },
-//           },
-//         },
-//       });
-
-//       const formattedPosts = posts.map((post) => ({
-//         id: post.platformPostId,
-//         title: post.title,
-//         url: post.url,
-//         publishedAt: post.publishedAt,
-//         platform: post.platform,
-//         hasComments: post._count.comments > 0,
-//         commentsCount: post._count.comments,
-//       }));
-
-//       res.status(200).json({
-//         message: "Posts fetched from database successfully",
-//         data: {
-//           posts: formattedPosts,
-//           source: "database",
-//           totalPosts: formattedPosts.length,
-//         },
-//       });
-//       return;
-//     }
-
-//     // For API source, redirect to use platform-specific endpoints
-//     res.status(400).json({
-//       error: "Invalid request",
-//       message: "To fetch from API, please use platform-specific endpoints: /platforms/{platform}/posts?source=api",
-//     });
-//   } catch (error: any) {
-//     console.error("Fetch posts error:", error);
-//     res.status(500).json({
-//       error: "Failed to fetch posts",
-//       message: "An error occurred while fetching posts",
-//     });
-//   }
-// });
-
-/**
- * POST /analysis/start
- * Initiate comment analysis for a post
- */
-router.post("/analysis/start", authenticateToken, async (req: Request, res: Response): Promise<void> => {
-  try {
-    if (!req.user) {
-      res.status(401).json({
-        error: "Unauthorized",
-        message: "User not authenticated",
-      });
-      return;
-    }
-
-    const { error, value } = startAnalysisSchema.validate(req.body);
-    if (error) {
-      res.status(400).json({
-        error: "Invalid request body",
-        message: error.details[0].message,
-      });
-      return;
-    }
-
-    const { postId } = value;
-    const userId = req.user.id;
-
-    // Validate analysis prerequisites
-    const validation = await analysisOrchestrationService.validateAnalysisPrerequisites(postId, userId);
-    if (!validation.valid) {
-      res.status(400).json({
-        error: "Analysis prerequisites not met",
-        message: "Cannot start analysis for this post",
-        details: validation.errors,
-      });
-      return;
-    }
-
-    // Check if there's already a running analysis for this post
-    const existingJob = await prisma.analysisJob.findFirst({
-      where: {
-        postId,
-        userId,
-        status: { in: ["PENDING", "RUNNING"] },
-      },
-    });
-
-    if (existingJob) {
-      res.status(409).json({
-        error: "Analysis already in progress",
-        message: "There is already an analysis running for this post",
-        data: {
-          jobId: existingJob.id,
-          status: existingJob.status,
-          progress: existingJob.progress,
-        },
-      });
-      return;
-    }
-
-    // Get the post and its comments
-    const post = await prisma.post.findFirst({
-      where: { id: postId, userId },
-      include: { comments: true },
-    });
-
-    if (!post) {
-      res.status(404).json({
-        error: "Post not found",
-        message: "Post not found or access denied",
-      });
-      return;
-    }
-
-    // If post has no comments, fetch them from the platform first
-    if (post.comments.length === 0) {
-      try {
-        await fetchCommentsForPost(post, userId);
-        // Refresh post data with comments
-        const updatedPost = await prisma.post.findFirst({
-          where: { id: postId },
-          include: { comments: true },
-        });
-        if (updatedPost) {
-          post.comments = updatedPost.comments;
-        }
-      } catch (fetchError: any) {
-        res.status(500).json({
-          error: "Failed to fetch comments",
-          message: "Could not fetch comments from the platform",
-          details: fetchError.message,
-        });
-        return;
-      }
-    }
-
-    // Create analysis job
-    const job = await jobManager.createJob(postId, userId, post.comments.length);
-
-    // Start analysis in background
-    const commentIds = post.comments.map((c) => c.id);
-    analysisOrchestrationService.processAnalysis(job.id, postId, userId, commentIds).catch((error) => {
-      console.error(`Background analysis failed for job ${job.id}:`, error);
-    });
-
-    res.status(202).json({
-      message: "Analysis started successfully",
-      data: {
-        jobId: job.id,
-        status: job.status,
-        progress: job.progress,
-        estimatedTime: analysisOrchestrationService.estimateAnalysisTime(post.comments.length),
-        totalComments: post.comments.length,
-      },
-    });
-  } catch (error: any) {
-    console.error("Start analysis error:", error);
-    res.status(500).json({
-      error: "Failed to start analysis",
-      message: "An error occurred while starting the analysis",
     });
   }
 });

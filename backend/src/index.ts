@@ -1,8 +1,8 @@
 /**
- * 1- YOUTUBE OAUTH
- * 2- TWITTER OAUTH
- * 3- FACEBOOK OAUTH
- * 4- INSTAGRAM OAUTH
+ * - TIKTOK OAUTH
+ * - TWITTER OAUTH
+ * - FACEBOOK OAUTH
+ * - INSTAGRAM OAUTH
  */
 import express from "express";
 import morgan from "morgan";
@@ -79,19 +79,15 @@ app.get("/health", (req, res) => {
 // Import routes
 import authRoutes from "./routes/authRoutes";
 import { oauthRoutes } from "./routes/oauthRoutes";
-import { tokenRoutes } from "./routes/tokenRoutes";
 import platformRoutes from "./routes/platformRoutes";
-import analysisRoutes from "./routes/analysisRoutes";
 
 // API routes
 app.use("/api/auth", authRoutes);
 app.use("/api/oauth", oauthRoutes);
-app.use("/api/tokens", tokenRoutes);
 app.use("/api/platforms", platformRoutes);
-app.use("/api/analysis", analysisRoutes);
 
 // API info endpoint
-app.use("/api", (req, res) => {
+app.use("/api", (_, res) => {
   res.status(200).json({
     message: "Comment Sentiment Analyzer API",
     version: "1.0.0",
@@ -99,7 +95,6 @@ app.use("/api", (req, res) => {
       health: "/health",
       auth: "/api/auth",
       oauth: "/api/oauth",
-      tokens: "/api/tokens",
       platforms: "/api/platforms",
       analysis: "/api/analysis",
     },

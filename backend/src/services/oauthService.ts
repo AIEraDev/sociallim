@@ -146,9 +146,14 @@ export class OAuthService {
             // Twitter OAuth 1.0a tokens don't expire, OAuth 2.0 without refresh token also doesn't expire
             return null;
           }
+          break;
         case Platform.TIKTOK:
           refreshResult = await this.refreshTikTokToken(connection.refreshToken);
           break;
+        case Platform.FACEBOOK:
+          // Facebook long-lived tokens (60 days) don't have refresh tokens
+          // They need to be re-authorized when they expire
+          return null;
         default:
           throw new Error(`Token refresh not implemented for platform: ${platform}`);
       }
@@ -298,6 +303,9 @@ export class OAuthService {
           return await this.validateTwitterToken(connection.accessToken);
         case Platform.TIKTOK:
           return await this.validateTikTokToken(connection.accessToken);
+        case Platform.FACEBOOK:
+        case Platform.INSTAGRAM:
+          return await this.validateMetaToken(connection.accessToken);
         default:
           return false;
       }
@@ -378,6 +386,23 @@ export class OAuthService {
         }
       );
       return response.status === 200 && !!response.data.data?.user?.open_id;
+    } catch (error) {
+      return false;
+    }
+  }
+
+  /**
+   * Validate Meta token by making a test API call (works for both Facebook and Instagram)
+   */
+  private async validateMetaToken(accessToken: string): Promise<boolean> {
+    try {
+      const response = await axios.get("https://graph.facebook.com/v18.0/me", {
+        params: {
+          fields: "id",
+          access_token: accessToken,
+        },
+      });
+      return response.status === 200 && !!response.data.id;
     } catch (error) {
       return false;
     }

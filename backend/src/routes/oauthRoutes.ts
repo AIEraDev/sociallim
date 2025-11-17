@@ -5,30 +5,15 @@ import { Platform } from "@prisma/client";
 import { encrypt } from "../utils/encryption";
 import { socialMediaServiceFactory } from "../services/socialMedia/socialMediaServiceFactory";
 import { twitterService } from "../services/socialMedia/twitterService";
+import { metaService } from "../services/socialMedia/metaService";
 import { generatePKCEChallenge } from "../utils/pkce";
 import { PKCEStore } from "../utils/pkceStore";
+import crypto from "crypto";
 
 const router = Router();
 
-/**
- *
- *
- *
- *
- *
- * TWITTER OAUTH Handler
- *
- *
- *
- *
- *
- *
- */
-
-/**
- * GET /oauth/twitter/authorize
- * Generate Twitter OAuth URL with PKCE
- */
+/*********************************************************  TWITTER OAUTH *********************************************************/
+/*** GET /oauth/twitter/authorize - Generate Twitter OAuth URL with PKCE ***/
 router.get("/twitter/authorize", authenticateToken, async (req: Request, res: Response) => {
   try {
     const userId = (req as any).user.id; // From your auth middleware
@@ -63,10 +48,7 @@ router.get("/twitter/authorize", authenticateToken, async (req: Request, res: Re
   }
 });
 
-/**
- * POST /oauth/twitter/callback
- * Handle Twitter OAuth callback
- */
+/*** POST /oauth/twitter/callback - Handle Twitter OAuth callback ***/
 router.post("/twitter/callback", authenticateToken, async (req: Request, res: Response) => {
   try {
     const { code, state } = req.body;
@@ -141,48 +123,11 @@ router.post("/twitter/callback", authenticateToken, async (req: Request, res: Re
   }
 });
 
-/**
- * DELETE /oauth/twitter/disconnect
- * Disconnect Twitter account
- */
-router.delete("/twitter/disconnect", authenticateToken, async (req: Request, res: Response) => {
-  try {
-    const userId = (req as any).user.id;
+/*********************************************************  TWITTER OAUTH *********************************************************/
 
-    // Remove connection from database
-    await oauthService.disconnectPlatform(userId, "TWITTER");
+/*********************************************************  META OAUTH *********************************************************/
 
-    return res.json({
-      success: true,
-      message: "Twitter account disconnected successfully",
-    });
-  } catch (error) {
-    console.error("Error disconnecting Twitter:", error);
-    return res.status(500).json({
-      error: "Failed to disconnect Twitter account",
-    });
-  }
-});
-
-/**
- *
- *
- *
- *
- *
- * TWITTER OAUTH Handler
- *
- *
- *
- *
- *
- *
- */
-
-/**
- * GET /oauth/connect/tiktok
- * Initiate TikTok OAuth flow
- */
+/*** GET /oauth/connect/tiktok - Initiate TikTok OAuth flow ***/
 router.get("/connect/tiktok", authenticateToken, (req: Request, res: Response) => {
   const userId = (req as any).user.id;
 
@@ -207,9 +152,7 @@ router.get("/connect/tiktok", authenticateToken, (req: Request, res: Response) =
   });
 });
 
-/**
- * TikTok OAuth callback - Following TikTok's official recommendation
- */
+/*** TikTok OAuth callback - Following TikTok's official recommendation ***/
 router.get("/tiktok/callback", async (req: Request, res: Response) => {
   try {
     const { code, state, error } = req.query;
@@ -290,168 +233,156 @@ router.get("/tiktok/callback", async (req: Request, res: Response) => {
   }
 });
 
-/**
- * POST /oauth/facebook/token
- * Handle NextAuth Facebook token and store connection
- */
-router.post("/facebook/token", authenticateToken, async (req: Request, res: Response) => {
+/*********************************************************  META OAUTH *********************************************************/
+
+/*** GET /oauth/meta/authorize - Generate Facebook authorization URL ***/
+router.get("/meta/authorize", authenticateToken, async (req: Request, res: Response) => {
   try {
-    const { accessToken, refreshToken, providerAccountId, userProfile } = req.body;
     const userId = (req as any).user.id;
 
-    if (!accessToken || !providerAccountId) {
-      return res.status(400).json({
-        error: "Missing required parameters",
-        message: "accessToken and providerAccountId are required",
-      });
-    }
+    // Generate state for CSRF protection
+    const state = crypto.randomBytes(16).toString("base64url");
 
-    // Verify the Facebook token and get user info
-    try {
-      const userResponse = await fetch(`https://graph.facebook.com/me?fields=id,name,email&access_token=${accessToken}`);
-      const userData = (await userResponse.json()) as any;
+    // Generate auth URL
+    const authUrl = metaService.instance.generateAuthUrl(state);
 
-      if (!userData.id || userData.id !== providerAccountId) {
-        return res.status(400).json({
-          error: "Invalid token",
-          message: "Facebook token validation failed",
-        });
-      }
+    // Store state (no PKCE needed for Facebook OAuth 2.0)
+    PKCEStore.set(state, {
+      codeVerifier: "", // Not used for Facebook
+      state,
+      userId,
+    });
 
-      // Store the Facebook connection
-      const oauthData = {
-        platform: Platform.FACEBOOK,
-        platformUserId: userData.id,
-        accessToken: encrypt(accessToken),
-        refreshToken: refreshToken ? encrypt(refreshToken) : null,
-        profile: {
-          id: userData.id,
-          name: userData.name,
-          email: userData.email,
-          ...userProfile,
-        },
-        tokenExpiresAt: new Date(Date.now() + 2 * 3600 * 1000), // 2 hours from now
-      };
-
-      await oauthService.storeConnection(userId, oauthData);
-
-      return res.json({
-        success: true,
-        message: "Facebook account connected successfully",
-        user: {
-          id: userData.id,
-          name: userData.name,
-          email: userData.email,
-        },
-      });
-    } catch (fbError) {
-      console.error("Facebook API error:", fbError);
-      return res.status(400).json({
-        error: "Facebook API error",
-        message: "Failed to verify Facebook token",
-      });
-    }
+    return res.json({ success: true, authUrl, state });
   } catch (error) {
-    console.error("Error handling Facebook token:", error);
+    console.error("Error generating Facebook auth URL:", error);
     return res.status(500).json({
-      error: "Internal server error",
-      message: "Failed to process Facebook connection",
+      error: "Failed to generate authorization URL",
     });
   }
 });
 
-/*** Get user's connected platforms */
-router.get("/connections", authenticateToken, async (req: Request, res: Response) => {
+/*** POST /oauth/meta/callback - Complete Facebook OAuth flow (from frontend) ***/
+router.post("/meta/callback", authenticateToken, async (req: Request, res: Response) => {
   try {
-    const userId = (req as any).user.id;
-    const connections = await oauthService.getUserConnections(userId);
-
-    return res.json({ connections });
-  } catch (error) {
-    console.error("Error getting connections:", error);
-    return res.status(500).json({ error: "Failed to get connections" });
-  }
-});
-
-/**
- * Validate token for a platform
- */
-router.get("/validate/:platform", authenticateToken, async (req: Request, res: Response) => {
-  try {
-    const { platform } = req.params;
+    const { code, state } = req.body;
     const userId = (req as any).user.id;
 
-    // Validate platform parameter
-    if (!Object.values(Platform).includes(platform.toUpperCase() as Platform)) {
-      return res.status(400).json({ error: "Invalid platform" });
-    }
-
-    const platformEnum = platform.toUpperCase() as Platform;
-    const isValid = await oauthService.validateToken(userId, platformEnum);
-
-    return res.json({ platform, isValid });
-  } catch (error) {
-    console.error("Error validating token:", error);
-    return res.status(500).json({ error: "Failed to validate token" });
-  }
-});
-
-/**
- * Refresh token for a platform
- */
-router.post("/refresh/:platform", authenticateToken, async (req: Request, res: Response) => {
-  try {
-    const { platform } = req.params;
-    const userId = (req as any).user.id;
-
-    // Validate platform parameter
-    if (!Object.values(Platform).includes(platform.toUpperCase() as Platform)) {
-      return res.status(400).json({ error: "Invalid platform" });
-    }
-
-    const platformEnum = platform.toUpperCase() as Platform;
-    const refreshResult = await oauthService.refreshToken(userId, platformEnum);
-
-    if (refreshResult) {
-      return res.json({
-        platform,
-        refreshed: true,
-        expiresAt: refreshResult.expiresAt,
-      });
-    } else {
-      return res.json({
-        platform,
-        refreshed: false,
-        message: "Token refresh not needed or not supported for this platform",
+    if (!code || !state) {
+      return res.status(400).json({
+        error: "Missing code or state parameter",
       });
     }
-  } catch (error) {
-    console.error("Error refreshing token:", error);
-    return res.status(500).json({ error: "Failed to refresh token" });
-  }
-});
 
-/**
- * Disconnect a platform
- */
-router.delete("/disconnect/:platform", authenticateToken, async (req: Request, res: Response) => {
-  try {
-    const { platform } = req.params;
-    const userId = (req as any).user.id;
+    // Retrieve stored state data
+    const stateData = PKCEStore.get(state);
 
-    // Validate platform parameter
-    if (!Object.values(Platform).includes(platform.toUpperCase() as Platform)) {
-      return res.status(400).json({ error: "Invalid platform" });
+    if (!stateData) {
+      return res.status(400).json({
+        error: "Invalid or expired state parameter",
+      });
     }
 
-    const platformEnum = platform.toUpperCase() as Platform;
-    await oauthService.disconnectPlatform(userId, platformEnum);
+    // Verify user matches
+    if (stateData.userId !== userId) {
+      return res.status(403).json({
+        error: "User mismatch",
+      });
+    }
 
-    return res.json({ platform, disconnected: true });
-  } catch (error) {
-    console.error("Error disconnecting platform:", error);
-    return res.status(500).json({ error: "Failed to disconnect platform" });
+    // Exchange code for short-lived token
+    const shortLivedToken = await metaService.instance.exchangeCodeForToken(code);
+
+    // Exchange for long-lived token (60 days)
+    const longLivedToken = await metaService.instance.getLongLivedToken(shortLivedToken.access_token);
+
+    // Fetch user info
+    const metaUser = await metaService.instance.fetchUserInfo(longLivedToken.access_token);
+
+    // Get user's Facebook Pages
+    const pages = await metaService.instance.getUserPages(longLivedToken.access_token);
+
+    // Get Instagram accounts connected to Pages
+    const instagramAccounts = await metaService.instance.getAllInstagramAccounts(longLivedToken.access_token);
+
+    // Store Meta connection (handles both Facebook and Instagram)
+    await oauthService.storeConnection(userId, {
+      platform: Platform.FACEBOOK, // Still uses Facebook platform internally
+      platformUserId: metaUser.id,
+      accessToken: encrypt(longLivedToken.access_token),
+      refreshToken: null, // Facebook doesn't use refresh tokens
+      profile: {
+        id: metaUser.id,
+        name: metaUser.name,
+        email: metaUser.email,
+        picture: metaUser.picture?.data?.url,
+        pages: pages,
+      },
+      tokenExpiresAt: new Date(Date.now() + 60 * 24 * 60 * 60 * 1000), // 60 days
+    });
+
+    // Store Instagram connections (one per page with Instagram)
+    for (const { page, instagram } of instagramAccounts) {
+      await oauthService.storeConnection(userId, {
+        platform: Platform.INSTAGRAM,
+        platformUserId: instagram.id,
+        accessToken: encrypt(page.access_token), // Use page access token
+        refreshToken: null,
+        profile: {
+          id: instagram.id,
+          username: instagram.username,
+          name: instagram.name,
+          profilePictureUrl: instagram.profile_picture_url,
+          followersCount: instagram.followers_count,
+          followingCount: instagram.follows_count,
+          mediaCount: instagram.media_count,
+          biography: instagram.biography,
+          website: instagram.website,
+          connectedPageId: page.id,
+          connectedPageName: page.name,
+        },
+        tokenExpiresAt: new Date(Date.now() + 60 * 24 * 60 * 60 * 1000),
+      });
+    }
+
+    // Clean up state
+    PKCEStore.delete(state);
+
+    return res.json({
+      success: true,
+      message: "Meta account connected successfully",
+      data: {
+        facebook: {
+          id: metaUser.id,
+          name: metaUser.name,
+          email: metaUser.email,
+          picture: metaUser.picture?.data?.url,
+          pagesCount: pages.length,
+        },
+        instagram: instagramAccounts.map(({ page, instagram }) => ({
+          id: instagram.id,
+          username: instagram.username,
+          name: instagram.name,
+          followersCount: instagram.followers_count,
+          connectedPage: page.name,
+        })),
+      },
+    });
+  } catch (error: any) {
+    console.error("Error in Facebook callback:", error);
+
+    if (error.response?.data) {
+      return res.status(400).json({
+        error: "Facebook API error",
+        message: error.response.data.error?.message || "Failed to authenticate",
+      });
+    }
+
+    return res.status(500).json({
+      error: "Failed to process Facebook callback",
+    });
   }
 });
+/*********************************************************  META OAUTH *********************************************************/
 
 export { router as oauthRoutes };

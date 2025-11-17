@@ -2,24 +2,6 @@ import Joi from "joi";
 import { Platform } from "@prisma/client";
 
 /**
- * Validation schema for starting analysis
- */
-export const startAnalysisSchema = Joi.object({
-  postId: Joi.string().trim().min(1).max(100).required().messages({
-    "string.empty": "Post ID cannot be empty",
-    "string.min": "Post ID is required",
-    "string.max": "Post ID is too long",
-    "any.required": "Post ID is required",
-  }),
-
-  options: Joi.object({
-    includeSpam: Joi.boolean().optional().default(false),
-    maxComments: Joi.number().integer().min(1).max(10000).optional().default(1000),
-    analysisDepth: Joi.string().valid("basic", "detailed", "comprehensive").optional().default("detailed"),
-  }).optional(),
-});
-
-/**
  * Validation schema for analysis export
  */
 export const exportAnalysisSchema = Joi.object({
@@ -157,16 +139,4 @@ export const idParamSchema = Joi.object({
     "string.max": "ID is too long",
     "any.required": "ID is required",
   }),
-});
-
-export const platformParamSchema = Joi.object({
-  platform: Joi.string()
-    .valid(...Object.values(Platform).map((p) => p.toLowerCase()))
-    .required()
-    .messages({
-      "any.only": `Platform must be one of: ${Object.values(Platform)
-        .map((p) => p.toLowerCase())
-        .join(", ")}`,
-      "any.required": "Platform is required",
-    }),
 });
